@@ -608,6 +608,39 @@ export default function EditorPage() {
         } catch { toast.error("Ayarlar kaydedilemedi"); }
     };
 
+    // Scale & center all layers when resolution changes
+    const handleResolutionChange = (newW: number, newH: number) => {
+        const oldW = renderWidth;
+        const oldH = renderHeight;
+        if (oldW === newW && oldH === newH) return;
+
+        const scaleX = newW / oldW;
+        const scaleY = newH / oldH;
+        const scale = Math.min(scaleX, scaleY); // uniform scale to fit
+
+        // Scale all layers proportionally and center in new canvas
+        setProject(prev => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                sourceFiles: prev.sourceFiles.map(sf => ({
+                    ...sf,
+                    layers: sf.layers.map(l => {
+                        const newLayerW = Math.round(l.width * scale);
+                        const newLayerH = Math.round(l.height * scale);
+                        // Scale position and then offset to center in new canvas
+                        const newX = Math.round(l.x * scale + (newW - oldW * scale) / 2);
+                        const newY = Math.round(l.y * scale + (newH - oldH * scale) / 2);
+                        return { ...l, x: newX, y: newY, width: newLayerW, height: newLayerH };
+                    }),
+                })),
+            };
+        });
+
+        setRenderWidth(newW);
+        setRenderHeight(newH);
+    };
+
     /* ── Save All (Kaydet) ── */
 
     const handleSaveProject = async () => {
@@ -1660,7 +1693,7 @@ export default function EditorPage() {
                                             <button
                                                 key={p.label}
                                                 className={`preset-chip ${renderWidth === p.w && renderHeight === p.h ? "active" : ""}`}
-                                                onClick={() => { setRenderWidth(p.w); setRenderHeight(p.h); }}
+                                                onClick={() => handleResolutionChange(p.w, p.h)}
                                             >
                                                 {p.label}
                                                 <span>{p.w}×{p.h}</span>
