@@ -1505,8 +1505,6 @@ body {
 /* ─── Timeline ──────────────────────────────── */
 
 .editor-timeline {
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border-glass);
   min-height: 100px;
   max-height: 200px;
   overflow-y: auto;
@@ -1862,12 +1860,50 @@ body {
   cursor: not-allowed;
 }
 
+/* ─── Bottom Tabs Container ──────────────────────── */
+
+.bottom-tabs-container {
+  border-top: 1px solid var(--border-glass);
+  background: var(--bg-secondary);
+}
+
+.bottom-tabs-header {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-glass);
+  padding: 0 16px;
+}
+
+.bottom-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.bottom-tab:hover {
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.bottom-tab.active {
+  color: var(--accent-purple);
+  border-bottom-color: var(--accent-purple);
+  font-weight: 600;
+}
+
 /* ─── AI Prompt Panel ──────────────────────────────── */
 
 .ai-panel {
-  background: var(--bg-secondary);
   padding: 14px 20px;
-  border-top: 1px solid var(--border-glass);
 }
 
 .ai-panel-header {

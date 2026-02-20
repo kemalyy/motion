@@ -155,6 +155,7 @@ export default function EditorPage() {
     const [layerImageUrls, setLayerImageUrls] = useState<Map<string, string>>(new Map());
     const [showRenderSettings, setShowRenderSettings] = useState(false);
     const [dragLayerId, setDragLayerId] = useState<string | null>(null);
+    const [bottomTab, setBottomTab] = useState<'timeline' | 'ai'>('timeline');
 
     // Render settings (editable, synced to project)
     const [renderWidth, setRenderWidth] = useState(1080);
@@ -905,187 +906,203 @@ export default function EditorPage() {
                     </div>
                 </div>
 
-                {/* ═══ Timeline ═══ */}
-                <div className="editor-timeline">
-                    <div className="timeline-header">
-                        <div className="timeline-labels">
-                            {(() => {
-                                const renderedGroups = new Set<string>();
-                                return allLayers.map((layer, index) => {
-                                    const groupName = (layer.metadata as { groupName?: string })?.groupName;
-                                    const elements: React.ReactNode[] = [];
-                                    if (groupName && !renderedGroups.has(groupName)) {
-                                        renderedGroups.add(groupName);
-                                        elements.push(
-                                            <div key={`tl-group-${groupName}`} className="timeline-label timeline-group-label">
-                                                <FolderOpen size={11} />
-                                                <span>{groupName}</span>
-                                            </div>
-                                        );
-                                    }
-                                    elements.push(
-                                        <div
-                                            key={layer.id}
-                                            className={`timeline-label ${selectedLayerId === layer.id ? "active" : ""} ${groupName ? "timeline-label-child" : ""}`}
-                                            onClick={() => setSelectedLayerId(layer.id)}
-                                        >
-                                            <div className="layer-color-dot" style={{ background: LAYER_COLORS[index % LAYER_COLORS.length] }} />
-                                            <span>{layer.name}</span>
-                                        </div>
-                                    );
-                                    return elements;
-                                });
-                            })()}
-                        </div>
-                        <div className="timeline-tracks" ref={timelineRef} onClick={handleTimelineClick}>
-                            {/* Markers */}
-                            <div className="timeline-markers">
-                                {Array.from({ length: Math.ceil(renderDuration / 1000) + 1 }, (_, i) => (
-                                    <div key={i} className="timeline-marker" style={{ left: `${timeToPercent(i * 1000)}%` }}>
-                                        <span>{i}s</span>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* Playhead */}
-                            <div className="timeline-playhead" style={{ left: `${timeToPercent(currentTime)}%` }} />
-
-                            {/* Bars (with group spacer rows) */}
-                            {(() => {
-                                const renderedGroups = new Set<string>();
-                                return allLayers.map((layer, index) => {
-                                    const groupName = (layer.metadata as { groupName?: string })?.groupName;
-                                    const anim = layer.layerAnimations[0];
-                                    const elements: React.ReactNode[] = [];
-
-                                    // Add spacer row for group header
-                                    if (groupName && !renderedGroups.has(groupName)) {
-                                        renderedGroups.add(groupName);
-                                        elements.push(
-                                            <div key={`tl-bar-group-${groupName}`} className="timeline-row timeline-group-row" />
-                                        );
-                                    }
-
-                                    if (!anim) {
-                                        elements.push(<div key={layer.id} className="timeline-row" />);
-                                    } else {
-                                        const left = timeToPercent(anim.delayMs);
-                                        const width = timeToPercent(anim.durationMs);
-                                        const color = LAYER_COLORS[index % LAYER_COLORS.length];
-                                        elements.push(
-                                            <div key={layer.id} className="timeline-row">
-                                                <div
-                                                    className={`timeline-bar ${selectedLayerId === layer.id ? "selected" : ""}`}
-                                                    style={{
-                                                        left: `${left}%`,
-                                                        width: `${Math.max(width, 1)}%`,
-                                                        background: `${color}cc`,
-                                                        borderColor: selectedLayerId === layer.id ? color : "transparent",
-                                                    }}
-                                                    onClick={(e) => { e.stopPropagation(); setSelectedLayerId(layer.id); }}
-                                                    onMouseDown={(e) => handleBarDrag(layer.id, "move", e)}
-                                                >
-                                                    <span className="timeline-bar-label">
-                                                        {ANIMATION_TYPES.find((t) => t.value === anim.animationType)?.label || anim.animationType}
-                                                    </span>
-                                                    <div
-                                                        className="timeline-bar-handle"
-                                                        onMouseDown={(e) => handleBarDrag(layer.id, "resize", e)}
-                                                    />
-                                                </div>
-                                            </div>
-                                        );
-                                    }
-                                    return elements;
-                                });
-                            })()}
-                        </div>
-                    </div>
-                </div>
-
-                {/* ═══ AI Panel ═══ */}
-                <div className="ai-panel">
-                    <div className="ai-panel-header">
-                        <Sparkles size={18} />
-                        <span>AI Animasyon Asistanı</span>
-                    </div>
-
-                    <div className="ai-prompt-row">
-                        <textarea
-                            className="ai-prompt-input"
-                            placeholder='Örn: "Logo katmanını soldan kaydırarak getir, alt yazıyı fade-in ile göster, dramatik olsun..."'
-                            value={aiPrompt}
-                            onChange={(e) => setAiPrompt(e.target.value)}
-                            rows={1}
-                            onKeyDown={(e) => {
-                                if (e.key === "Enter" && !e.shiftKey) {
-                                    e.preventDefault();
-                                    handleAIPrompt();
-                                }
-                            }}
-                        />
-                        <button className="btn-ai" onClick={handleAIPrompt} disabled={aiLoading || !aiPrompt.trim()}>
-                            {aiLoading ? (
-                                <><span className="spinner" style={{ width: 16, height: 16 }} /> Düşünüyor...</>
-                            ) : (
-                                <><Sparkles size={16} /> AI ile Animasyonla</>
-                            )}
+                {/* ═══ Bottom Tabs: Timeline / AI ═══ */}
+                <div className="bottom-tabs-container">
+                    <div className="bottom-tabs-header">
+                        <button
+                            className={`bottom-tab ${bottomTab === 'timeline' ? 'active' : ''}`}
+                            onClick={() => setBottomTab('timeline')}
+                        >
+                            <Play size={14} /> Zaman Çizelgesi
+                        </button>
+                        <button
+                            className={`bottom-tab ${bottomTab === 'ai' ? 'active' : ''}`}
+                            onClick={() => setBottomTab('ai')}
+                        >
+                            <Sparkles size={14} /> AI Asistan
                         </button>
                     </div>
 
-                    <div className="ai-templates">
-                        {AI_TEMPLATES.map((template) => (
-                            <button key={template} className="ai-template-chip" onClick={() => setAiPrompt(template)}>
-                                {template}
-                            </button>
-                        ))}
-                    </div>
-
-                    {aiSuggestions && (
-                        <div style={{
-                            marginTop: 16, padding: 16, borderRadius: "var(--radius-md)",
-                            background: "rgba(139, 92, 246, 0.08)", border: "1px solid rgba(139, 92, 246, 0.2)"
-                        }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                                <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>
-                                    AI Önerileri ({aiSuggestions.length} katman)
-                                </span>
-                                <div style={{ display: "flex", gap: 8 }}>
-                                    <button className="btn btn-secondary" style={{ padding: "6px 16px", fontSize: "0.85rem" }}
-                                        onClick={() => setAiSuggestions(null)}>İptal</button>
-                                    <button className="btn btn-primary" style={{ padding: "6px 16px", fontSize: "0.85rem" }}
-                                        onClick={applyAISuggestions}>✓ Uygula</button>
+                    {/* Timeline Tab */}
+                    {bottomTab === 'timeline' && (
+                        <div className="editor-timeline">
+                            <div className="timeline-header">
+                                <div className="timeline-labels">
+                                    {(() => {
+                                        const renderedGroups = new Set<string>();
+                                        return allLayers.map((layer, index) => {
+                                            const groupName = (layer.metadata as { groupName?: string })?.groupName;
+                                            const elements: React.ReactNode[] = [];
+                                            if (groupName && !renderedGroups.has(groupName)) {
+                                                renderedGroups.add(groupName);
+                                                elements.push(
+                                                    <div key={`tl-group-${groupName}`} className="timeline-label timeline-group-label">
+                                                        <FolderOpen size={11} />
+                                                        <span>{groupName}</span>
+                                                    </div>
+                                                );
+                                            }
+                                            elements.push(
+                                                <div
+                                                    key={layer.id}
+                                                    className={`timeline-label ${selectedLayerId === layer.id ? "active" : ""} ${groupName ? "timeline-label-child" : ""}`}
+                                                    onClick={() => setSelectedLayerId(layer.id)}
+                                                >
+                                                    <div className="layer-color-dot" style={{ background: LAYER_COLORS[index % LAYER_COLORS.length] }} />
+                                                    <span>{layer.name}</span>
+                                                </div>
+                                            );
+                                            return elements;
+                                        });
+                                    })()}
                                 </div>
-                            </div>
-                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                                {aiSuggestions.map((s, i) => (
-                                    <div key={i} style={{
-                                        padding: "8px 14px", borderRadius: "var(--radius-sm)",
-                                        background: "rgba(255,255,255,0.05)", fontSize: "0.8rem",
-                                        border: "1px solid var(--border-glass)"
-                                    }}>
-                                        <strong>{s.layerName}</strong>: {s.animationType} ({s.durationMs}ms, {s.delayMs}ms delay)
+                                <div className="timeline-tracks" ref={timelineRef} onClick={handleTimelineClick}>
+                                    {/* Markers */}
+                                    <div className="timeline-markers">
+                                        {Array.from({ length: Math.ceil(renderDuration / 1000) + 1 }, (_, i) => (
+                                            <div key={i} className="timeline-marker" style={{ left: `${timeToPercent(i * 1000)}%` }}>
+                                                <span>{i}s</span>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
+
+                                    {/* Playhead */}
+                                    <div className="timeline-playhead" style={{ left: `${timeToPercent(currentTime)}%` }} />
+
+                                    {/* Bars */}
+                                    {(() => {
+                                        const renderedGroups = new Set<string>();
+                                        return allLayers.map((layer, index) => {
+                                            const groupName = (layer.metadata as { groupName?: string })?.groupName;
+                                            const anim = layer.layerAnimations[0];
+                                            const elements: React.ReactNode[] = [];
+
+                                            if (groupName && !renderedGroups.has(groupName)) {
+                                                renderedGroups.add(groupName);
+                                                elements.push(
+                                                    <div key={`tl-bar-group-${groupName}`} className="timeline-row timeline-group-row" />
+                                                );
+                                            }
+
+                                            if (!anim) {
+                                                elements.push(<div key={layer.id} className="timeline-row" />);
+                                            } else {
+                                                const left = timeToPercent(anim.delayMs);
+                                                const width = timeToPercent(anim.durationMs);
+                                                const color = LAYER_COLORS[index % LAYER_COLORS.length];
+                                                elements.push(
+                                                    <div key={layer.id} className="timeline-row">
+                                                        <div
+                                                            className={`timeline-bar ${selectedLayerId === layer.id ? "selected" : ""}`}
+                                                            style={{
+                                                                left: `${left}%`,
+                                                                width: `${Math.max(width, 1)}%`,
+                                                                background: `${color}cc`,
+                                                                borderColor: selectedLayerId === layer.id ? color : "transparent",
+                                                            }}
+                                                            onClick={(e) => { e.stopPropagation(); setSelectedLayerId(layer.id); }}
+                                                            onMouseDown={(e) => handleBarDrag(layer.id, "move", e)}
+                                                        >
+                                                            <span className="timeline-bar-label">
+                                                                {ANIMATION_TYPES.find((t) => t.value === anim.animationType)?.label || anim.animationType}
+                                                            </span>
+                                                            <div
+                                                                className="timeline-bar-handle"
+                                                                onMouseDown={(e) => handleBarDrag(layer.id, "resize", e)}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+                                            return elements;
+                                        });
+                                    })()}
+                                </div>
                             </div>
                         </div>
                     )}
 
-                    {project.promptHistory && project.promptHistory.length > 0 && (
-                        <details style={{ marginTop: 12 }}>
-                            <summary style={{ cursor: "pointer", fontSize: "0.8rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 4 }}>
-                                <ChevronDown size={14} /> Önceki Promptlar ({project.promptHistory.length})
-                            </summary>
-                            <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
-                                {project.promptHistory.map((h) => (
-                                    <button key={h.id} className="ai-template-chip"
-                                        style={{ textAlign: "left", justifyContent: "flex-start" }}
-                                        onClick={() => setAiPrompt(h.prompt)}>
-                                        {h.applied ? "✓ " : ""}{h.prompt.slice(0, 80)}{h.prompt.length > 80 ? "..." : ""}
+                    {/* AI Tab */}
+                    {bottomTab === 'ai' && (
+                        <div className="ai-panel">
+                            <div className="ai-prompt-row">
+                                <textarea
+                                    className="ai-prompt-input"
+                                    placeholder='Örn: "Logo katmanını soldan kaydırarak getir, alt yazıyı fade-in ile göster, dramatik olsun..."'
+                                    value={aiPrompt}
+                                    onChange={(e) => setAiPrompt(e.target.value)}
+                                    rows={1}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleAIPrompt();
+                                        }
+                                    }}
+                                />
+                                <button className="btn-ai" onClick={handleAIPrompt} disabled={aiLoading || !aiPrompt.trim()}>
+                                    {aiLoading ? (
+                                        <><span className="spinner" style={{ width: 16, height: 16 }} /> Düşünüyor...</>
+                                    ) : (
+                                        <><Sparkles size={16} /> AI ile Animasyonla</>
+                                    )}
+                                </button>
+                            </div>
+
+                            <div className="ai-templates">
+                                {AI_TEMPLATES.map((template) => (
+                                    <button key={template} className="ai-template-chip" onClick={() => setAiPrompt(template)}>
+                                        {template}
                                     </button>
                                 ))}
                             </div>
-                        </details>
+
+                            {aiSuggestions && (
+                                <div style={{
+                                    marginTop: 12, padding: 12, borderRadius: "var(--radius-md)",
+                                    background: "rgba(139, 92, 246, 0.08)", border: "1px solid rgba(139, 92, 246, 0.2)"
+                                }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                                        <span style={{ fontWeight: 600, fontSize: "0.85rem" }}>
+                                            AI Önerileri ({aiSuggestions.length} katman)
+                                        </span>
+                                        <div style={{ display: "flex", gap: 8 }}>
+                                            <button className="btn btn-secondary" style={{ padding: "4px 12px", fontSize: "0.8rem" }}
+                                                onClick={() => setAiSuggestions(null)}>İptal</button>
+                                            <button className="btn btn-primary" style={{ padding: "4px 12px", fontSize: "0.8rem" }}
+                                                onClick={applyAISuggestions}>✓ Uygula</button>
+                                        </div>
+                                    </div>
+                                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                        {aiSuggestions.map((s, i) => (
+                                            <div key={i} style={{
+                                                padding: "6px 10px", borderRadius: "var(--radius-sm)",
+                                                background: "rgba(255,255,255,0.05)", fontSize: "0.75rem",
+                                                border: "1px solid var(--border-glass)"
+                                            }}>
+                                                <strong>{s.layerName}</strong>: {s.animationType} ({s.durationMs}ms)
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {project.promptHistory && project.promptHistory.length > 0 && (
+                                <details style={{ marginTop: 8 }}>
+                                    <summary style={{ cursor: "pointer", fontSize: "0.75rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 4 }}>
+                                        <ChevronDown size={14} /> Önceki Promptlar ({project.promptHistory.length})
+                                    </summary>
+                                    <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+                                        {project.promptHistory.map((h) => (
+                                            <button key={h.id} className="ai-template-chip"
+                                                style={{ textAlign: "left", justifyContent: "flex-start" }}
+                                                onClick={() => setAiPrompt(h.prompt)}>
+                                                {h.applied ? "✓ " : ""}{h.prompt.slice(0, 80)}{h.prompt.length > 80 ? "..." : ""}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </details>
+                            )}
+                        </div>
                     )}
                 </div>
             </div>
