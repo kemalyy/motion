@@ -741,6 +741,11 @@ export default function EditorPage() {
         }
         setRendering(true);
         setRenderProgress(0);
+        setRenderStatus("Kaydediliyor...");
+
+        // Save all local changes first
+        await handleSaveProject();
+
         setRenderStatus("Başlatılıyor...");
 
         try {
