@@ -8,7 +8,7 @@ import {
     ArrowLeft, Play, Pause, RotateCcw, Eye, EyeOff,
     GripVertical, Sparkles, Download, Save, ChevronDown,
     Loader2, Settings2, ArrowUp, ArrowDown, X, Monitor,
-    FolderOpen
+    FolderOpen, Type, Trash2, AlignLeft, AlignCenter, AlignRight
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { renderToVideo, downloadBlob, getVideoExtension, calcAnimationState, type RenderLayer, type RenderConfig } from "@/lib/render-engine";
@@ -129,6 +129,14 @@ const RESOLUTION_PRESETS = [
     { label: "HD 720p", w: 1280, h: 720 },
     { label: "Full HD", w: 1920, h: 1080 },
     { label: "4K", w: 3840, h: 2160 },
+];
+
+const FONT_OPTIONS = [
+    "Inter", "Poppins", "Montserrat", "Roboto", "Oswald",
+    "Playfair Display", "Raleway", "Outfit", "Bebas Neue",
+    "Lato", "Open Sans", "Nunito", "Ubuntu", "Quicksand",
+    "Cabin", "Merriweather", "Source Sans 3", "DM Sans",
+    "Space Grotesk", "JetBrains Mono",
 ];
 
 /* ────────── Component ────────── */
@@ -333,6 +341,50 @@ export default function EditorPage() {
             if (res.ok) fetchProject();
         } catch { toast.error("Sıralama başarısız"); }
         setDragLayerId(null);
+    };
+
+    /* ── Text Layer ── */
+
+    const handleAddTextLayer = async () => {
+        try {
+            const res = await fetch(`/api/projects/${projectId}/text-layers`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ textContent: "Metin Yaz" }),
+            });
+            if (res.ok) {
+                const layer = await res.json();
+                toast.success("Metin katmanı eklendi");
+                fetchProject();
+                setSelectedLayerId(layer.id);
+            } else {
+                toast.error("Metin katmanı eklenemedi");
+            }
+        } catch { toast.error("Metin katmanı eklenemedi"); }
+    };
+
+    const handleUpdateTextLayer = async (layerId: string, updates: Record<string, unknown>) => {
+        try {
+            const res = await fetch(`/api/projects/${projectId}/text-layers/${layerId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(updates),
+            });
+            if (res.ok) fetchProject();
+        } catch { toast.error("Metin güncellenemedi"); }
+    };
+
+    const handleDeleteTextLayer = async (layerId: string) => {
+        try {
+            const res = await fetch(`/api/projects/${projectId}/text-layers/${layerId}`, {
+                method: "DELETE",
+            });
+            if (res.ok) {
+                toast.success("Metin katmanı silindi");
+                setSelectedLayerId(null);
+                fetchProject();
+            }
+        } catch { toast.error("Silinemedi"); }
     };
 
     /* ── Render Settings ── */
@@ -588,7 +640,16 @@ export default function EditorPage() {
                 <div className="editor-main">
                     {/* Left — Layers */}
                     <div className="editor-layers">
-                        <h3>Katmanlar</h3>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                            <h3 style={{ margin: 0 }}>Katmanlar</h3>
+                            <button
+                                className="btn btn-ghost"
+                                style={{ padding: "4px 10px", fontSize: "0.78rem", gap: 4 }}
+                                onClick={handleAddTextLayer}
+                            >
+                                <Type size={14} /> Metin Ekle
+                            </button>
+                        </div>
                         {(() => {
                             // Build group headers from metadata
                             const renderedGroups = new Set<string>();
@@ -727,84 +788,216 @@ export default function EditorPage() {
 
                     {/* Right — Settings */}
                     <div className="editor-settings">
-                        <h3>Animasyon Ayarları</h3>
-
-                        {selectedLayer && selectedAnimation ? (
+                        {/* Text Layer Editing */}
+                        {selectedLayer && (selectedLayer as unknown as { isTextLayer?: boolean }).isTextLayer ? (
                             <>
-                                <p style={{ fontSize: "0.9rem", fontWeight: 600, marginBottom: 16, color: "var(--accent-purple)" }}>
+                                <h3>Metin Ayarları</h3>
+                                <p style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: 12, color: "var(--accent-purple)" }}>
+                                    <Type size={14} style={{ marginRight: 4, verticalAlign: -2 }} />
                                     {selectedLayer.name}
                                 </p>
 
                                 <div className="settings-group">
-                                    <label>Animasyon Tipi</label>
+                                    <label>Metin İçeriği</label>
+                                    <textarea
+                                        className="input"
+                                        rows={3}
+                                        value={(selectedLayer as unknown as { textContent?: string }).textContent || ""}
+                                        onChange={(e) => handleUpdateTextLayer(selectedLayer.id, { textContent: e.target.value })}
+                                        style={{ resize: "vertical", fontSize: "0.85rem" }}
+                                    />
+                                </div>
+
+                                <div className="settings-group">
+                                    <label>Font</label>
                                     <select
-                                        value={selectedAnimation.animationType}
-                                        onChange={(e) => updateAnimation(selectedLayer.id, { animationType: e.target.value })}
+                                        value={(selectedLayer as unknown as { fontFamily?: string }).fontFamily || "Inter"}
+                                        onChange={(e) => handleUpdateTextLayer(selectedLayer.id, { fontFamily: e.target.value })}
                                     >
-                                        {ANIMATION_TYPES.map((t) => (
-                                            <option key={t.value} value={t.value}>{t.label}</option>
+                                        {FONT_OPTIONS.map((f) => (
+                                            <option key={f} value={f}>{f}</option>
                                         ))}
                                     </select>
                                 </div>
 
                                 <div className="settings-group">
-                                    <label>Süre: {selectedAnimation.durationMs}ms</label>
-                                    <input type="range" min={100} max={5000} step={100}
-                                        value={selectedAnimation.durationMs}
-                                        onChange={(e) => updateAnimation(selectedLayer.id, { durationMs: parseInt(e.target.value) })} />
+                                    <label>Boyut: {(selectedLayer as unknown as { fontSize?: number }).fontSize || 48}px</label>
+                                    <input type="range" min={12} max={200} step={2}
+                                        value={(selectedLayer as unknown as { fontSize?: number }).fontSize || 48}
+                                        onChange={(e) => handleUpdateTextLayer(selectedLayer.id, { fontSize: parseInt(e.target.value) })} />
                                 </div>
 
                                 <div className="settings-group">
-                                    <label>Gecikme: {selectedAnimation.delayMs}ms</label>
-                                    <input type="range" min={0} max={10000} step={100}
-                                        value={selectedAnimation.delayMs}
-                                        onChange={(e) => updateAnimation(selectedLayer.id, { delayMs: parseInt(e.target.value) })} />
+                                    <label>Renk</label>
+                                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                        <input
+                                            type="color"
+                                            value={(selectedLayer as unknown as { fontColor?: string }).fontColor || "#FFFFFF"}
+                                            onChange={(e) => handleUpdateTextLayer(selectedLayer.id, { fontColor: e.target.value })}
+                                            style={{ width: 36, height: 28, padding: 0, border: "none", borderRadius: 4, cursor: "pointer" }}
+                                        />
+                                        <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                                            {(selectedLayer as unknown as { fontColor?: string }).fontColor || "#FFFFFF"}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 <div className="settings-group">
-                                    <label>Easing</label>
-                                    <select
-                                        value={selectedAnimation.easing}
-                                        onChange={(e) => updateAnimation(selectedLayer.id, { easing: e.target.value })}
-                                    >
-                                        {EASING_OPTIONS.map((e) => (
-                                            <option key={e.value} value={e.value}>{e.label}</option>
+                                    <label>Hizalama</label>
+                                    <div style={{ display: "flex", gap: 4 }}>
+                                        {(["left", "center", "right"] as const).map((align) => (
+                                            <button
+                                                key={align}
+                                                className={`btn btn-ghost ${(selectedLayer as unknown as { textAlign?: string }).textAlign === align ? "active" : ""}`}
+                                                style={{ padding: "6px 12px", flex: 1 }}
+                                                onClick={() => handleUpdateTextLayer(selectedLayer.id, { textAlign: align })}
+                                            >
+                                                {align === "left" ? <AlignLeft size={14} /> : align === "center" ? <AlignCenter size={14} /> : <AlignRight size={14} />}
+                                            </button>
                                         ))}
+                                    </div>
+                                </div>
+
+                                <div className="settings-group">
+                                    <label>Kalınlık</label>
+                                    <select
+                                        value={(selectedLayer as unknown as { fontWeight?: number }).fontWeight || 600}
+                                        onChange={(e) => handleUpdateTextLayer(selectedLayer.id, { fontWeight: parseInt(e.target.value) })}
+                                    >
+                                        <option value={300}>Light (300)</option>
+                                        <option value={400}>Regular (400)</option>
+                                        <option value={500}>Medium (500)</option>
+                                        <option value={600}>Semibold (600)</option>
+                                        <option value={700}>Bold (700)</option>
+                                        <option value={800}>Extra Bold (800)</option>
+                                        <option value={900}>Black (900)</option>
                                     </select>
                                 </div>
 
-                                <div className="settings-group">
-                                    <label>Opaklık: {selectedAnimation.fromOpacity} → {selectedAnimation.toOpacity}</label>
-                                    <div style={{ display: "flex", gap: 8 }}>
-                                        <input type="range" min={0} max={1} step={0.1}
-                                            value={selectedAnimation.fromOpacity}
-                                            onChange={(e) => updateAnimation(selectedLayer.id, { fromOpacity: parseFloat(e.target.value) })} />
-                                        <input type="range" min={0} max={1} step={0.1}
-                                            value={selectedAnimation.toOpacity}
-                                            onChange={(e) => updateAnimation(selectedLayer.id, { toOpacity: parseFloat(e.target.value) })} />
-                                    </div>
-                                </div>
+                                <hr style={{ border: "none", borderTop: "1px solid var(--border-glass)", margin: "16px 0" }} />
 
-                                <div className="settings-group">
-                                    <label>Ölçek: {selectedAnimation.fromScale}× → {selectedAnimation.toScale}×</label>
-                                    <div style={{ display: "flex", gap: 8 }}>
-                                        <input type="range" min={0} max={2} step={0.1}
-                                            value={selectedAnimation.fromScale}
-                                            onChange={(e) => updateAnimation(selectedLayer.id, { fromScale: parseFloat(e.target.value) })} />
-                                        <input type="range" min={0} max={2} step={0.1}
-                                            value={selectedAnimation.toScale}
-                                            onChange={(e) => updateAnimation(selectedLayer.id, { toScale: parseFloat(e.target.value) })} />
-                                    </div>
-                                </div>
+                                <h3>Animasyon Ayarları</h3>
+                                {selectedAnimation ? (
+                                    <>
+                                        <div className="settings-group">
+                                            <label>Animasyon Tipi</label>
+                                            <select
+                                                value={selectedAnimation.animationType}
+                                                onChange={(e) => updateAnimation(selectedLayer.id, { animationType: e.target.value })}
+                                            >
+                                                {ANIMATION_TYPES.map((t) => (
+                                                    <option key={t.value} value={t.value}>{t.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="settings-group">
+                                            <label>Süre: {selectedAnimation.durationMs}ms</label>
+                                            <input type="range" min={100} max={5000} step={100}
+                                                value={selectedAnimation.durationMs}
+                                                onChange={(e) => updateAnimation(selectedLayer.id, { durationMs: parseInt(e.target.value) })} />
+                                        </div>
+                                        <div className="settings-group">
+                                            <label>Gecikme: {selectedAnimation.delayMs}ms</label>
+                                            <input type="range" min={0} max={10000} step={100}
+                                                value={selectedAnimation.delayMs}
+                                                onChange={(e) => updateAnimation(selectedLayer.id, { delayMs: parseInt(e.target.value) })} />
+                                        </div>
+                                    </>
+                                ) : (
+                                    <p style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>Animasyon ayarı yok.</p>
+                                )}
+
+                                <button
+                                    className="btn btn-ghost"
+                                    style={{ width: "100%", marginTop: 16, color: "var(--accent-red, #ef4444)", borderColor: "rgba(239,68,68,0.3)" }}
+                                    onClick={() => handleDeleteTextLayer(selectedLayer.id)}
+                                >
+                                    <Trash2 size={14} /> Metin Katmanını Sil
+                                </button>
                             </>
-                        ) : selectedLayer ? (
-                            <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                                Bu katman için animasyon ayarı yok.
-                            </p>
                         ) : (
-                            <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                                Ayarları görmek için bir katman seçin.
-                            </p>
+                            <>
+                                <h3>Animasyon Ayarları</h3>
+
+                                {selectedLayer && selectedAnimation ? (
+                                    <>
+                                        <p style={{ fontSize: "0.9rem", fontWeight: 600, marginBottom: 16, color: "var(--accent-purple)" }}>
+                                            {selectedLayer.name}
+                                        </p>
+
+                                        <div className="settings-group">
+                                            <label>Animasyon Tipi</label>
+                                            <select
+                                                value={selectedAnimation.animationType}
+                                                onChange={(e) => updateAnimation(selectedLayer.id, { animationType: e.target.value })}
+                                            >
+                                                {ANIMATION_TYPES.map((t) => (
+                                                    <option key={t.value} value={t.value}>{t.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="settings-group">
+                                            <label>Süre: {selectedAnimation.durationMs}ms</label>
+                                            <input type="range" min={100} max={5000} step={100}
+                                                value={selectedAnimation.durationMs}
+                                                onChange={(e) => updateAnimation(selectedLayer.id, { durationMs: parseInt(e.target.value) })} />
+                                        </div>
+
+                                        <div className="settings-group">
+                                            <label>Gecikme: {selectedAnimation.delayMs}ms</label>
+                                            <input type="range" min={0} max={10000} step={100}
+                                                value={selectedAnimation.delayMs}
+                                                onChange={(e) => updateAnimation(selectedLayer.id, { delayMs: parseInt(e.target.value) })} />
+                                        </div>
+
+                                        <div className="settings-group">
+                                            <label>Easing</label>
+                                            <select
+                                                value={selectedAnimation.easing}
+                                                onChange={(e) => updateAnimation(selectedLayer.id, { easing: e.target.value })}
+                                            >
+                                                {EASING_OPTIONS.map((e) => (
+                                                    <option key={e.value} value={e.value}>{e.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="settings-group">
+                                            <label>Opaklık: {selectedAnimation.fromOpacity} → {selectedAnimation.toOpacity}</label>
+                                            <div style={{ display: "flex", gap: 8 }}>
+                                                <input type="range" min={0} max={1} step={0.1}
+                                                    value={selectedAnimation.fromOpacity}
+                                                    onChange={(e) => updateAnimation(selectedLayer.id, { fromOpacity: parseFloat(e.target.value) })} />
+                                                <input type="range" min={0} max={1} step={0.1}
+                                                    value={selectedAnimation.toOpacity}
+                                                    onChange={(e) => updateAnimation(selectedLayer.id, { toOpacity: parseFloat(e.target.value) })} />
+                                            </div>
+                                        </div>
+
+                                        <div className="settings-group">
+                                            <label>Ölçek: {selectedAnimation.fromScale}× → {selectedAnimation.toScale}×</label>
+                                            <div style={{ display: "flex", gap: 8 }}>
+                                                <input type="range" min={0} max={2} step={0.1}
+                                                    value={selectedAnimation.fromScale}
+                                                    onChange={(e) => updateAnimation(selectedLayer.id, { fromScale: parseFloat(e.target.value) })} />
+                                                <input type="range" min={0} max={2} step={0.1}
+                                                    value={selectedAnimation.toScale}
+                                                    onChange={(e) => updateAnimation(selectedLayer.id, { toScale: parseFloat(e.target.value) })} />
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : selectedLayer ? (
+                                    <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                                        Bu katman için animasyon ayarı yok.
+                                    </p>
+                                ) : (
+                                    <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                                        Ayarları görmek için bir katman seçin.
+                                    </p>
+                                )}
+
+                            </>
                         )}
                     </div>
                 </div>

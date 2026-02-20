@@ -114,6 +114,15 @@ model Layer {
   metadata     Json?
   createdAt    DateTime @default(now())
 
+  // Text layer fields
+  isTextLayer  Boolean  @default(false)
+  textContent  String?  @db.Text
+  fontFamily   String?  @default("Inter")
+  fontSize     Int?     @default(48)
+  fontColor    String?  @default("#FFFFFF")
+  textAlign    String?  @default("center")
+  fontWeight   Int?     @default(600)
+
   sourceFile      SourceFile       @relation(fields: [sourceFileId], references: [id], onDelete: Cascade)
   layerAnimations LayerAnimation[]
 }
