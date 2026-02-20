@@ -197,6 +197,7 @@ export default function EditorPage() {
     // Canvas drag state
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+    const [dragPos, setDragPos] = useState<{ layerId: string; x: number; y: number } | null>(null);
     const canvasContainerRef = useRef<HTMLDivElement>(null);
 
     /* ── Fetch Project ── */
@@ -462,19 +463,8 @@ export default function EditorPage() {
         const newX = (e.clientX - rect.left) * scaleX - dragOffset.x;
         const newY = (e.clientY - rect.top) * scaleY - dragOffset.y;
 
-        // Update locally for instant feedback
-        setProject(prev => {
-            if (!prev) return prev;
-            return {
-                ...prev,
-                sourceFiles: prev.sourceFiles.map(sf => ({
-                    ...sf,
-                    layers: sf.layers.map(l =>
-                        l.id === selectedLayerId ? { ...l, x: newX, y: newY } : l
-                    ),
-                })),
-            };
-        });
+        // Use lightweight dragPos state instead of setProject to avoid re-render loop
+        setDragPos({ layerId: selectedLayerId, x: newX, y: newY });
     };
 
     const handleCanvasMouseUp = async () => {
@@ -484,8 +474,25 @@ export default function EditorPage() {
         }
         setIsDragging(false);
 
-        const layer = allLayers.find(l => l.id === selectedLayerId);
-        if (!layer) return;
+        if (!dragPos) return;
+        const finalX = dragPos.x;
+        const finalY = dragPos.y;
+        const layerId = dragPos.layerId;
+        setDragPos(null);
+
+        // Sync to project state once
+        setProject(prev => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                sourceFiles: prev.sourceFiles.map(sf => ({
+                    ...sf,
+                    layers: sf.layers.map(l =>
+                        l.id === layerId ? { ...l, x: finalX, y: finalY } : l
+                    ),
+                })),
+            };
+        });
 
         // Save position to API
         try {
@@ -493,7 +500,7 @@ export default function EditorPage() {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    updates: [{ layerId: layer.id, x: layer.x, y: layer.y }],
+                    updates: [{ layerId, x: finalX, y: finalY }],
                 }),
             });
         } catch { /* silent fail, local state is updated */ }
@@ -882,10 +889,12 @@ export default function EditorPage() {
                                     const imgUrl = layerImageUrls.get(layer.id);
                                     if (!imgUrl) return null;
 
-                                    // Calculate preview position from layer x/y
+                                    // Calculate preview position from layer x/y (use dragPos for active drag)
                                     const previewScale = canvasW / renderWidth;
-                                    const layerLeft = layer.x * previewScale;
-                                    const layerTop = layer.y * previewScale;
+                                    const lx = (dragPos && dragPos.layerId === layer.id) ? dragPos.x : layer.x;
+                                    const ly = (dragPos && dragPos.layerId === layer.id) ? dragPos.y : layer.y;
+                                    const layerLeft = lx * previewScale;
+                                    const layerTop = ly * previewScale;
                                     const layerW = layer.width * previewScale;
                                     const layerH = layer.height * previewScale;
 
