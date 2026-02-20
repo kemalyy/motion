@@ -8,7 +8,8 @@ import {
     ArrowLeft, Play, Pause, RotateCcw, Eye, EyeOff,
     GripVertical, Sparkles, Download, Save, ChevronDown,
     Loader2, Settings2, ArrowUp, ArrowDown, X, Monitor,
-    FolderOpen, Type, Trash2, AlignLeft, AlignCenter, AlignRight
+    FolderOpen, Type, Trash2, AlignLeft, AlignCenter, AlignRight,
+    Repeat2
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { renderToVideo, downloadBlob, getVideoExtension, calcAnimationState, type RenderLayer, type RenderConfig } from "@/lib/render-engine";
@@ -151,6 +152,7 @@ export default function EditorPage() {
     const [loading, setLoading] = useState(true);
     const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
+    const [isLooping, setIsLooping] = useState(false);
     const [currentTime, setCurrentTime] = useState(0);
     const [aiPrompt, setAiPrompt] = useState("");
     const [aiLoading, setAiLoading] = useState(false);
@@ -262,6 +264,10 @@ export default function EditorPage() {
         playIntervalRef.current = setInterval(() => {
             setCurrentTime((prev) => {
                 if (prev >= renderDuration) {
+                    if (isLooping) {
+                        if (audioRef.current) { audioRef.current.currentTime = 0; audioRef.current.play().catch(() => { }); }
+                        return 0;
+                    }
                     setIsPlaying(false);
                     if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
                     return 0;
@@ -792,6 +798,13 @@ export default function EditorPage() {
                                 if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
                             }}>
                                 <RotateCcw size={18} />
+                            </button>
+                            <button
+                                onClick={() => setIsLooping(!isLooping)}
+                                title={isLooping ? "Loop Kapat" : "Loop Aç"}
+                                style={{ color: isLooping ? "var(--accent-purple)" : "var(--text-muted)" }}
+                            >
+                                <Repeat2 size={18} />
                             </button>
                             {audioUrl && <span style={{ fontSize: '0.75rem', color: 'var(--accent-purple)', marginLeft: 4 }}>🔊 Ses</span>}
                             <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", minWidth: 80, textAlign: "center" }}>
