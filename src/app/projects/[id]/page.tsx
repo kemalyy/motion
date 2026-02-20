@@ -173,6 +173,8 @@ export default function EditorPage() {
     const [visibleLayers, setVisibleLayers] = useState<Set<string>>(new Set());
     const [layerImageUrls, setLayerImageUrls] = useState<Map<string, string>>(new Map());
     const [dragLayerId, setDragLayerId] = useState<string | null>(null);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
     const [bottomTab, setBottomTab] = useState<'timeline' | 'ai' | 'settings'>('timeline');
 
     // Render settings (editable, synced to project)
@@ -337,6 +339,7 @@ export default function EditorPage() {
                 })),
             };
         });
+        setHasUnsavedChanges(true);
     };
 
     const moveLayer = async (layerId: string, direction: "up" | "down") => {
@@ -420,6 +423,7 @@ export default function EditorPage() {
                 })),
             };
         });
+        setHasUnsavedChanges(true);
     };
 
     // Text content updater — local state only
@@ -618,6 +622,10 @@ export default function EditorPage() {
         const scaleY = newH / oldH;
         const scale = Math.min(scaleX, scaleY); // uniform scale to fit
 
+        // Update dimensions first so canvas preview matches
+        setRenderWidth(newW);
+        setRenderHeight(newH);
+
         // Scale all layers proportionally and center in new canvas
         setProject(prev => {
             if (!prev) return prev;
@@ -628,7 +636,6 @@ export default function EditorPage() {
                     layers: sf.layers.map(l => {
                         const newLayerW = Math.round(l.width * scale);
                         const newLayerH = Math.round(l.height * scale);
-                        // Scale position and then offset to center in new canvas
                         const newX = Math.round(l.x * scale + (newW - oldW * scale) / 2);
                         const newY = Math.round(l.y * scale + (newH - oldH * scale) / 2);
                         return { ...l, x: newX, y: newY, width: newLayerW, height: newLayerH };
@@ -637,8 +644,7 @@ export default function EditorPage() {
             };
         });
 
-        setRenderWidth(newW);
-        setRenderHeight(newH);
+        setHasUnsavedChanges(true);
     };
 
     /* ── Save All (Kaydet) ── */
@@ -719,6 +725,8 @@ export default function EditorPage() {
 
             await Promise.all(promises);
             toast.success("Proje kaydedildi!");
+            setHasUnsavedChanges(false);
+            setLastSavedAt(new Date());
             fetchProject(); // Sync with server after save
         } catch {
             toast.error("Kaydetme başarısız");
@@ -1009,6 +1017,17 @@ export default function EditorPage() {
                         </span>
                     </div>
                     <div className="editor-topbar-actions">
+                        {hasUnsavedChanges && (
+                            <span style={{ fontSize: "0.7rem", color: "var(--accent-red, #ef4444)", display: "flex", alignItems: "center", gap: 4 }}>
+                                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent-red, #ef4444)", display: "inline-block" }} />
+                                Kaydedilmedi
+                            </span>
+                        )}
+                        {lastSavedAt && !hasUnsavedChanges && (
+                            <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", marginRight: 4 }}>
+                                {lastSavedAt.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                        )}
                         <button className="btn btn-ghost" onClick={handleSaveProject}>
                             <Save size={16} /> Kaydet
                         </button>
@@ -1159,13 +1178,30 @@ export default function EditorPage() {
                                         userSelect: "none",
                                     };
 
-                                    // Text layers: inline SVG so Google Fonts work in preview
-                                    if (layer.isTextLayer && layer.svgContent) {
+                                    // Text layers: render from current properties for instant preview
+                                    if (layer.isTextLayer) {
+                                        const text = layer.textContent || "";
+                                        const font = layer.fontFamily || "Inter";
+                                        const size = layer.fontSize || 48;
+                                        const color = layer.fontColor || "#FFFFFF";
+                                        const align = layer.textAlign || "center";
+                                        const weight = layer.fontWeight || 600;
+                                        const anchorMap: Record<string, string> = { left: "start", center: "middle", right: "end" };
+                                        const anchor = anchorMap[align] || "middle";
+                                        const xPos = align === "left" ? size * 0.5 : align === "right" ? layer.width - size * 0.5 : layer.width / 2;
+                                        const lines = text.split("\n");
+                                        const lineH = size * 1.3;
+                                        const totalH = lines.length * lineH;
+                                        const startY = (layer.height - totalH) / 2 + size;
+                                        const tspans = lines.map((line, i) =>
+                                            `<tspan x='${xPos}' dy='${i === 0 ? 0 : lineH}'>${line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</tspan>`
+                                        ).join("");
+                                        const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${layer.width} ${layer.height}' width='${layer.width}' height='${layer.height}'><text x='${xPos}' y='${startY}' font-family='${font}, sans-serif' font-size='${size}' font-weight='${weight}' fill='${color}' text-anchor='${anchor}' dominant-baseline='auto'>${tspans}</text></svg>`;
                                         return (
                                             <div
                                                 key={layer.id}
                                                 style={commonStyle}
-                                                dangerouslySetInnerHTML={{ __html: layer.svgContent }}
+                                                dangerouslySetInnerHTML={{ __html: svg }}
                                                 onMouseDown={(e) => handleCanvasMouseDown(e, layer.id)}
                                             />
                                         );
