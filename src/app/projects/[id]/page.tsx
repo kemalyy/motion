@@ -9,7 +9,7 @@ import {
     GripVertical, Sparkles, Download, Save, ChevronDown,
     Loader2, Settings2, ArrowUp, ArrowDown, X, Monitor,
     FolderOpen, Type, Trash2, AlignLeft, AlignCenter, AlignRight,
-    Repeat2, Move
+    Repeat2, Move, Undo2, Redo2
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { renderToVideo, downloadBlob, getVideoExtension, calcAnimationState, type RenderLayer, type RenderConfig } from "@/lib/render-engine";
@@ -198,6 +198,12 @@ export default function EditorPage() {
     const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const saveProjectRef = useRef<(() => Promise<void>) | null>(null);
 
+    // Undo/Redo stacks (max 30 snapshots)
+    const undoStackRef = useRef<Project[]>([]);
+    const redoStackRef = useRef<Project[]>([]);
+    const [undoCount, setUndoCount] = useState(0);
+    const [redoCount, setRedoCount] = useState(0);
+
     // Canvas drag state
     const [isDragging, setIsDragging] = useState(false);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -308,6 +314,54 @@ export default function EditorPage() {
     const selectedLayer = allLayers.find((l) => l.id === selectedLayerId);
     const selectedAnimation = selectedLayer?.layerAnimations[0];
 
+    /* ── Undo/Redo ── */
+
+    const pushUndo = () => {
+        if (!project) return;
+        const snapshot = JSON.parse(JSON.stringify(project)) as Project;
+        undoStackRef.current.push(snapshot);
+        if (undoStackRef.current.length > 30) undoStackRef.current.shift();
+        redoStackRef.current = []; // Clear redo on new action
+        setUndoCount(undoStackRef.current.length);
+        setRedoCount(0);
+    };
+
+    const handleUndo = () => {
+        if (undoStackRef.current.length === 0 || !project) return;
+        const snapshot = undoStackRef.current.pop()!;
+        redoStackRef.current.push(JSON.parse(JSON.stringify(project)));
+        setProject(snapshot);
+        setUndoCount(undoStackRef.current.length);
+        setRedoCount(redoStackRef.current.length);
+        setHasUnsavedChanges(true);
+    };
+
+    const handleRedo = () => {
+        if (redoStackRef.current.length === 0 || !project) return;
+        const snapshot = redoStackRef.current.pop()!;
+        undoStackRef.current.push(JSON.parse(JSON.stringify(project)));
+        setProject(snapshot);
+        setUndoCount(undoStackRef.current.length);
+        setRedoCount(redoStackRef.current.length);
+        setHasUnsavedChanges(true);
+    };
+
+    // Keyboard shortcuts: Ctrl+Z / Ctrl+Shift+Z
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    handleRedo();
+                } else {
+                    handleUndo();
+                }
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    });
+
     /* ── Layer operations ── */
 
     const toggleLayerVisibility = (layerId: string) => {
@@ -320,6 +374,7 @@ export default function EditorPage() {
     };
 
     const updateAnimation = (layerId: string, updates: Partial<LayerAnimation>) => {
+        pushUndo();
         // Local-only update — no API call until user clicks "Kaydet"
         setProject(prev => {
             if (!prev) return prev;
@@ -410,6 +465,7 @@ export default function EditorPage() {
     };
 
     const handleUpdateTextLayer = (layerId: string, updates: Record<string, unknown>) => {
+        pushUndo();
         // Local-only update — no API call until user clicks "Kaydet"
         setProject(prev => {
             if (!prev) return prev;
@@ -526,6 +582,7 @@ export default function EditorPage() {
 
     // Update layer position from input fields  
     const handleUpdateLayerPosition = async (layerId: string, updates: { x?: number; y?: number; width?: number; height?: number }) => {
+        pushUndo();
         setProject(prev => {
             if (!prev) return prev;
             return {
@@ -621,6 +678,8 @@ export default function EditorPage() {
         const scaleX = newW / oldW;
         const scaleY = newH / oldH;
         const scale = Math.min(scaleX, scaleY); // uniform scale to fit
+
+        pushUndo();
 
         // Update dimensions first so canvas preview matches
         setRenderWidth(newW);
@@ -1017,6 +1076,12 @@ export default function EditorPage() {
                         </span>
                     </div>
                     <div className="editor-topbar-actions">
+                        <button className="btn btn-ghost" onClick={handleUndo} disabled={undoCount === 0} title="Geri Al (Ctrl+Z)" style={{ padding: '6px 8px', opacity: undoCount === 0 ? 0.3 : 1 }}>
+                            <Undo2 size={16} />
+                        </button>
+                        <button className="btn btn-ghost" onClick={handleRedo} disabled={redoCount === 0} title="Yinele (Ctrl+Shift+Z)" style={{ padding: '6px 8px', opacity: redoCount === 0 ? 0.3 : 1 }}>
+                            <Redo2 size={16} />
+                        </button>
                         {hasUnsavedChanges && (
                             <span style={{ fontSize: "0.7rem", color: "var(--accent-red, #ef4444)", display: "flex", alignItems: "center", gap: 4 }}>
                                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent-red, #ef4444)", display: "inline-block" }} />
