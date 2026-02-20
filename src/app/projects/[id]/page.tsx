@@ -857,6 +857,32 @@ export default function EditorPage() {
 
     /* ── AI ── */
 
+    // Stagger/Cascade — apply staggered delays across all layers
+    const handleCascade = (staggerMs: number) => {
+        pushUndo();
+        setProject(prev => {
+            if (!prev) return prev;
+            const layerIds = prev.sourceFiles.flatMap(sf => sf.layers).map(l => l.id);
+            return {
+                ...prev,
+                sourceFiles: prev.sourceFiles.map(sf => ({
+                    ...sf,
+                    layers: sf.layers.map(l => {
+                        const globalIndex = layerIds.indexOf(l.id);
+                        return {
+                            ...l,
+                            layerAnimations: l.layerAnimations.map((a, i) =>
+                                i === 0 ? { ...a, delayMs: globalIndex * staggerMs } : a
+                            ),
+                        };
+                    }),
+                })),
+            };
+        });
+        setHasUnsavedChanges(true);
+        toast.success(`Cascade uygulandı (${staggerMs}ms aralık)`);
+    };
+
     const handleAIPrompt = async () => {
         if (!aiPrompt.trim()) return;
         setAiLoading(true);
@@ -1604,6 +1630,26 @@ export default function EditorPage() {
                     {/* Timeline Tab */}
                     {bottomTab === 'timeline' && (
                         <div className="editor-timeline">
+                            {/* Cascade presets bar */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderBottom: '1px solid var(--border-glass)', fontSize: '0.75rem' }}>
+                                <span style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Cascade:</span>
+                                {[
+                                    { label: 'Yumuşak Akış', ms: 100 },
+                                    { label: 'Hızlı Pop', ms: 50 },
+                                    { label: 'Dramatik', ms: 300 },
+                                    { label: 'Sıralı', ms: 200 },
+                                ].map(p => (
+                                    <button
+                                        key={p.label}
+                                        className="preset-chip"
+                                        onClick={() => handleCascade(p.ms)}
+                                        style={{ fontSize: '0.7rem', padding: '3px 8px' }}
+                                    >
+                                        {p.label}
+                                        <span style={{ opacity: 0.6 }}>{p.ms}ms</span>
+                                    </button>
+                                ))}
+                            </div>
                             <div className="timeline-header">
                                 <div className="timeline-labels">
                                     {(() => {
