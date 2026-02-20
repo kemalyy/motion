@@ -157,6 +157,7 @@ model LayerAnimation {
   toOpacity         Float   @default(1)
   fromScale         Float   @default(1)
   toScale           Float   @default(1)
+  keyframes         Json?
   customParams      Json?
 
   animationPreset AnimationPreset @relation(fields: [animationPresetId], references: [id], onDelete: Cascade)

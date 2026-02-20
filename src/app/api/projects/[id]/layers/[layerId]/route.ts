@@ -54,6 +54,7 @@ export async function PUT(
                 toOpacity: body.toOpacity,
                 fromScale: body.fromScale,
                 toScale: body.toScale,
+                keyframes: body.keyframes ?? undefined,
                 sortOrder: body.sortOrder,
             },
             create: {
@@ -66,6 +67,7 @@ export async function PUT(
                 easing: body.easing || "easeInOut",
                 fromOpacity: body.fromOpacity ?? 0,
                 toOpacity: body.toOpacity ?? 1,
+                keyframes: body.keyframes ?? undefined,
             },
         });
 

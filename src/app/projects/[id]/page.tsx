@@ -27,6 +27,15 @@ interface LayerAnimation {
     fromScale: number;
     toScale: number;
     direction?: string;
+    keyframes?: Keyframe[] | null;
+}
+
+interface Keyframe {
+    time: number; // 0-1 normalized
+    opacity: number;
+    scale: number;
+    x: number;
+    y: number;
 }
 
 interface Layer {
@@ -730,6 +739,7 @@ export default function EditorPage() {
                                 toOpacity: anim.toOpacity,
                                 fromScale: anim.fromScale,
                                 toScale: anim.toScale,
+                                keyframes: anim.keyframes || null,
                             }),
                         })
                     );
@@ -882,6 +892,93 @@ export default function EditorPage() {
         setHasUnsavedChanges(true);
         toast.success(`Cascade uygulandı (${staggerMs}ms aralık)`);
     };
+
+    /* ── Keyframes ── */
+
+    const addKeyframe = (layerId: string, timeNormalized: number) => {
+        pushUndo();
+        setProject(prev => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                sourceFiles: prev.sourceFiles.map(sf => ({
+                    ...sf,
+                    layers: sf.layers.map(l => {
+                        if (l.id !== layerId) return l;
+                        const anim = l.layerAnimations[0];
+                        if (!anim) return l;
+                        const existing = (anim.keyframes || []) as Keyframe[];
+                        if (existing.some(k => Math.abs(k.time - timeNormalized) < 0.02)) return l;
+                        const newKf: Keyframe = { time: timeNormalized, opacity: 1, scale: 1, x: 0, y: 0 };
+                        const updated = [...existing, newKf].sort((a, b) => a.time - b.time);
+                        return {
+                            ...l,
+                            layerAnimations: l.layerAnimations.map((a, i) =>
+                                i === 0 ? { ...a, keyframes: updated } : a
+                            ),
+                        };
+                    }),
+                })),
+            };
+        });
+        setHasUnsavedChanges(true);
+    };
+
+    const removeKeyframe = (layerId: string, kfIndex: number) => {
+        pushUndo();
+        setProject(prev => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                sourceFiles: prev.sourceFiles.map(sf => ({
+                    ...sf,
+                    layers: sf.layers.map(l => {
+                        if (l.id !== layerId) return l;
+                        const anim = l.layerAnimations[0];
+                        if (!anim || !anim.keyframes) return l;
+                        const updated = (anim.keyframes as Keyframe[]).filter((_, i) => i !== kfIndex);
+                        return {
+                            ...l,
+                            layerAnimations: l.layerAnimations.map((a, i) =>
+                                i === 0 ? { ...a, keyframes: updated.length > 0 ? updated : null } : a
+                            ),
+                        };
+                    }),
+                })),
+            };
+        });
+        setHasUnsavedChanges(true);
+    };
+
+    const updateKeyframe = (layerId: string, kfIndex: number, updates: Partial<Keyframe>) => {
+        pushUndo();
+        setProject(prev => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                sourceFiles: prev.sourceFiles.map(sf => ({
+                    ...sf,
+                    layers: sf.layers.map(l => {
+                        if (l.id !== layerId) return l;
+                        const anim = l.layerAnimations[0];
+                        if (!anim || !anim.keyframes) return l;
+                        const updated = (anim.keyframes as Keyframe[]).map((k, i) =>
+                            i === kfIndex ? { ...k, ...updates } : k
+                        );
+                        return {
+                            ...l,
+                            layerAnimations: l.layerAnimations.map((a, i) =>
+                                i === 0 ? { ...a, keyframes: updated } : a
+                            ),
+                        };
+                    }),
+                })),
+            };
+        });
+        setHasUnsavedChanges(true);
+    };
+
+    /* ── AI ── */
 
     const handleAIPrompt = async () => {
         if (!aiPrompt.trim()) return;
@@ -1726,10 +1823,41 @@ export default function EditorPage() {
                                                             }}
                                                             onClick={(e) => { e.stopPropagation(); selectLayer(layer.id); }}
                                                             onMouseDown={(e) => handleBarDrag(layer.id, "move", e)}
+                                                            onDoubleClick={(e) => {
+                                                                // Double-click to add keyframe at this position
+                                                                e.stopPropagation();
+                                                                const barEl = e.currentTarget;
+                                                                const rect = barEl.getBoundingClientRect();
+                                                                const xInBar = e.clientX - rect.left;
+                                                                const timeNormalized = Math.max(0, Math.min(1, xInBar / rect.width));
+                                                                addKeyframe(layer.id, timeNormalized);
+                                                            }}
                                                         >
                                                             <span className="timeline-bar-label">
                                                                 {ANIMATION_TYPES.find((t) => t.value === anim.animationType)?.label || anim.animationType}
                                                             </span>
+                                                            {/* Keyframe diamonds */}
+                                                            {anim.keyframes && (anim.keyframes as Keyframe[]).map((kf, kfIdx) => (
+                                                                <div
+                                                                    key={kfIdx}
+                                                                    onClick={(e) => { e.stopPropagation(); }}
+                                                                    onDoubleClick={(e) => { e.stopPropagation(); removeKeyframe(layer.id, kfIdx); }}
+                                                                    title={`t=${(kf.time * 100).toFixed(0)}% | opacity=${kf.opacity} | scale=${kf.scale} — Çift tıkla sil`}
+                                                                    style={{
+                                                                        position: 'absolute',
+                                                                        left: `${kf.time * 100}%`,
+                                                                        top: '50%',
+                                                                        transform: 'translate(-50%, -50%) rotate(45deg)',
+                                                                        width: 8,
+                                                                        height: 8,
+                                                                        background: '#fff',
+                                                                        border: '1.5px solid #000',
+                                                                        borderRadius: 1,
+                                                                        cursor: 'pointer',
+                                                                        zIndex: 5,
+                                                                    }}
+                                                                />
+                                                            ))}
                                                             <div
                                                                 className="timeline-bar-handle"
                                                                 onMouseDown={(e) => handleBarDrag(layer.id, "resize", e)}
@@ -1978,6 +2106,6 @@ export default function EditorPage() {
                     )}
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
