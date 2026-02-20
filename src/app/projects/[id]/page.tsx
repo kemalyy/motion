@@ -315,15 +315,26 @@ export default function EditorPage() {
         });
     };
 
-    const updateAnimation = async (layerId: string, updates: Partial<LayerAnimation>) => {
-        try {
-            const res = await fetch(`/api/projects/${projectId}/layers/${layerId}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(updates),
-            });
-            if (res.ok) fetchProject();
-        } catch { toast.error("Güncelleme başarısız"); }
+    const updateAnimation = (layerId: string, updates: Partial<LayerAnimation>) => {
+        // Local-only update — no API call until user clicks "Kaydet"
+        setProject(prev => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                sourceFiles: prev.sourceFiles.map(sf => ({
+                    ...sf,
+                    layers: sf.layers.map(l => {
+                        if (l.id !== layerId) return l;
+                        return {
+                            ...l,
+                            layerAnimations: l.layerAnimations.map((a, i) =>
+                                i === 0 ? { ...a, ...updates } : a
+                            ),
+                        };
+                    }),
+                })),
+            };
+        });
     };
 
     const moveLayer = async (layerId: string, direction: "up" | "down") => {
@@ -393,27 +404,28 @@ export default function EditorPage() {
         } catch { toast.error("Metin katmanı eklenemedi"); }
     };
 
-    const handleUpdateTextLayer = async (layerId: string, updates: Record<string, unknown>) => {
-        try {
-            const res = await fetch(`/api/projects/${projectId}/text-layers/${layerId}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(updates),
-            });
-            if (res.ok) fetchProject();
-        } catch { toast.error("Metin güncellenemedi"); }
+    const handleUpdateTextLayer = (layerId: string, updates: Record<string, unknown>) => {
+        // Local-only update — no API call until user clicks "Kaydet"
+        setProject(prev => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                sourceFiles: prev.sourceFiles.map(sf => ({
+                    ...sf,
+                    layers: sf.layers.map(l =>
+                        l.id === layerId ? { ...l, ...updates } : l
+                    ),
+                })),
+            };
+        });
     };
 
-    // Debounced text content updater — prevents fetchProject on every keystroke
+    // Text content updater — local state only
     const handleTextContentChange = (layerId: string, newText: string) => {
         setEditingTextContent(newText);
         setEditingTextLayerId(layerId);
-        // Clear previous timer
-        if (textUpdateTimerRef.current) clearTimeout(textUpdateTimerRef.current);
-        // Set new timer — API call after 600ms of no typing
-        textUpdateTimerRef.current = setTimeout(() => {
-            handleUpdateTextLayer(layerId, { textContent: newText });
-        }, 600);
+        // Update local project state immediately
+        handleUpdateTextLayer(layerId, { textContent: newText });
     };
 
     // Sync local text state when layer selection changes
@@ -592,6 +604,90 @@ export default function EditorPage() {
                 toast.success("Render ayarları kaydedildi");
             }
         } catch { toast.error("Ayarlar kaydedilemedi"); }
+    };
+
+    /* ── Save All (Kaydet) ── */
+
+    const handleSaveProject = async () => {
+        if (!project) return;
+        try {
+            const promises: Promise<Response>[] = [];
+
+            for (const layer of allLayers) {
+                // Save animation changes
+                const anim = layer.layerAnimations[0];
+                if (anim) {
+                    promises.push(
+                        fetch(`/api/projects/${projectId}/layers/${layer.id}`, {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                animationType: anim.animationType,
+                                durationMs: anim.durationMs,
+                                delayMs: anim.delayMs,
+                                easing: anim.easing,
+                                fromOpacity: anim.fromOpacity,
+                                toOpacity: anim.toOpacity,
+                                fromScale: anim.fromScale,
+                                toScale: anim.toScale,
+                            }),
+                        })
+                    );
+                }
+
+                // Save text layer properties
+                if (layer.isTextLayer) {
+                    promises.push(
+                        fetch(`/api/projects/${projectId}/text-layers/${layer.id}`, {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                textContent: layer.textContent,
+                                fontFamily: layer.fontFamily,
+                                fontSize: layer.fontSize,
+                                fontColor: layer.fontColor,
+                                textAlign: layer.textAlign,
+                                fontWeight: layer.fontWeight,
+                            }),
+                        })
+                    );
+                }
+
+                // Save positions
+                promises.push(
+                    fetch(`/api/projects/${projectId}/layers/position`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            updates: [{ layerId: layer.id, x: layer.x, y: layer.y, width: layer.width, height: layer.height }],
+                        }),
+                    })
+                );
+            }
+
+            // Also save render settings
+            promises.push(
+                fetch(`/api/projects/${projectId}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        width: renderWidth,
+                        height: renderHeight,
+                        fps: renderFps,
+                        durationMs: renderDuration,
+                        backgroundColor: renderBg,
+                        backgroundType: bgType,
+                        backgroundGradient: bgType === "gradient" ? bgGradient : null,
+                    }),
+                })
+            );
+
+            await Promise.all(promises);
+            toast.success("Proje kaydedildi!");
+            fetchProject(); // Sync with server after save
+        } catch {
+            toast.error("Kaydetme başarısız");
+        }
     };
 
     /* ── AI ── */
@@ -810,7 +906,7 @@ export default function EditorPage() {
                         </span>
                     </div>
                     <div className="editor-topbar-actions">
-                        <button className="btn btn-ghost" onClick={() => toast.success("Kaydedildi!")}>
+                        <button className="btn btn-ghost" onClick={handleSaveProject}>
                             <Save size={16} /> Kaydet
                         </button>
                         <button
