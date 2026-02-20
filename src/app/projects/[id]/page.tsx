@@ -914,613 +914,613 @@ export default function EditorPage() {
                                 })}
                             </div>
                         </div>
-                    </div>
 
-                    {/* Playback */}
-                    <div className="canvas-controls">
-                        <button onClick={() => {
-                            if (isPlaying) {
-                                setIsPlaying(false);
-                                if (audioRef.current) audioRef.current.pause();
-                            } else {
-                                if (currentTime >= renderDuration) setCurrentTime(0);
-                                setIsPlaying(true);
-                            }
-                        }}>
-                            {isPlaying ? <Pause size={18} /> : <Play size={18} />}
-                        </button>
-                        <button onClick={() => {
-                            setIsPlaying(false); setCurrentTime(0);
-                            if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
-                        }}>
-                            <RotateCcw size={18} />
-                        </button>
-                        <button
-                            onClick={() => setIsLooping(!isLooping)}
-                            title={isLooping ? "Loop Kapat" : "Loop Aç"}
-                            style={{ color: isLooping ? "var(--accent-purple)" : "var(--text-muted)" }}
-                        >
-                            <Repeat2 size={18} />
-                        </button>
-                        {audioUrl && <span style={{ fontSize: '0.75rem', color: 'var(--accent-purple)', marginLeft: 4 }}>🔊 Ses</span>}
-                        <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", minWidth: 80, textAlign: "center" }}>
-                            {(currentTime / 1000).toFixed(1)}s / {(renderDuration / 1000).toFixed(1)}s
-                        </span>
-                    </div>
-                </div>
-
-                {/* Right — Settings */}
-                <div className="editor-settings">
-                    {/* Text Layer Editing */}
-                    {selectedLayer && selectedLayer.isTextLayer ? (
-                        <>
-                            <h3>Metin Ayarları</h3>
-                            <p style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: 12, color: "var(--accent-purple)" }}>
-                                <Type size={14} style={{ marginRight: 4, verticalAlign: -2 }} />
-                                {selectedLayer.name}
-                            </p>
-
-                            <div className="settings-group">
-                                <label>Metin İçeriği</label>
-                                <textarea
-                                    className="input"
-                                    rows={3}
-                                    value={editingTextLayerId === selectedLayer.id ? editingTextContent : (selectedLayer.textContent || "")}
-                                    onChange={(e) => handleTextContentChange(selectedLayer.id, e.target.value)}
-                                    onFocus={() => {
-                                        setEditingTextLayerId(selectedLayer.id);
-                                        setEditingTextContent(selectedLayer.textContent || "");
-                                    }}
-                                    style={{ resize: "vertical", fontSize: "0.85rem" }}
-                                />
-                            </div>
-
-                            <div className="settings-group">
-                                <label>Font</label>
-                                <select
-                                    value={selectedLayer.fontFamily || "Inter"}
-                                    onChange={(e) => handleUpdateTextLayer(selectedLayer.id, { fontFamily: e.target.value })}
-                                >
-                                    {FONT_OPTIONS.map((f) => (
-                                        <option key={f} value={f}>{f}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="settings-group">
-                                <label>Boyut: {selectedLayer.fontSize || 48}px</label>
-                                <input type="range" min={12} max={200} step={2}
-                                    value={selectedLayer.fontSize || 48}
-                                    onChange={(e) => handleUpdateTextLayer(selectedLayer.id, { fontSize: parseInt(e.target.value) })} />
-                            </div>
-
-                            <div className="settings-group">
-                                <label>Renk</label>
-                                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                                    <input
-                                        type="color"
-                                        value={selectedLayer.fontColor || "#FFFFFF"}
-                                        onChange={(e) => handleUpdateTextLayer(selectedLayer.id, { fontColor: e.target.value })}
-                                        style={{ width: 36, height: 28, padding: 0, border: "none", borderRadius: 4, cursor: "pointer" }}
-                                    />
-                                    <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
-                                        {selectedLayer.fontColor || "#FFFFFF"}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div className="settings-group">
-                                <label>Hizalama</label>
-                                <div style={{ display: "flex", gap: 4 }}>
-                                    {(["left", "center", "right"] as const).map((align) => (
-                                        <button
-                                            key={align}
-                                            className={`btn btn-ghost ${selectedLayer.textAlign === align ? "active" : ""}`}
-                                            style={{ padding: "6px 12px", flex: 1 }}
-                                            onClick={() => handleUpdateTextLayer(selectedLayer.id, { textAlign: align })}
-                                        >
-                                            {align === "left" ? <AlignLeft size={14} /> : align === "center" ? <AlignCenter size={14} /> : <AlignRight size={14} />}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="settings-group">
-                                <label>Kalınlık</label>
-                                <select
-                                    value={selectedLayer.fontWeight || 600}
-                                    onChange={(e) => handleUpdateTextLayer(selectedLayer.id, { fontWeight: parseInt(e.target.value) })}
-                                >
-                                    <option value={300}>Light (300)</option>
-                                    <option value={400}>Regular (400)</option>
-                                    <option value={500}>Medium (500)</option>
-                                    <option value={600}>Semibold (600)</option>
-                                    <option value={700}>Bold (700)</option>
-                                    <option value={800}>Extra Bold (800)</option>
-                                    <option value={900}>Black (900)</option>
-                                </select>
-                            </div>
-
-                            <hr style={{ border: "none", borderTop: "1px solid var(--border-glass)", margin: "16px 0" }} />
-
-                            <h3>Animasyon Ayarları</h3>
-                            {selectedAnimation ? (
-                                <>
-                                    <div className="settings-group">
-                                        <label>Animasyon Tipi</label>
-                                        <select
-                                            value={selectedAnimation.animationType}
-                                            onChange={(e) => updateAnimation(selectedLayer.id, { animationType: e.target.value })}
-                                        >
-                                            {ANIMATION_TYPES.map((t) => (
-                                                <option key={t.value} value={t.value}>{t.label}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="settings-group">
-                                        <label>Süre: {selectedAnimation.durationMs}ms</label>
-                                        <input type="range" min={100} max={5000} step={100}
-                                            value={selectedAnimation.durationMs}
-                                            onChange={(e) => updateAnimation(selectedLayer.id, { durationMs: parseInt(e.target.value) })} />
-                                    </div>
-                                    <div className="settings-group">
-                                        <label>Gecikme: {selectedAnimation.delayMs}ms</label>
-                                        <input type="range" min={0} max={10000} step={100}
-                                            value={selectedAnimation.delayMs}
-                                            onChange={(e) => updateAnimation(selectedLayer.id, { delayMs: parseInt(e.target.value) })} />
-                                    </div>
-                                </>
-                            ) : (
-                                <p style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>Animasyon ayarı yok.</p>
-                            )}
-
-                            <button
-                                className="btn btn-ghost"
-                                style={{ width: "100%", marginTop: 16, color: "var(--accent-red, #ef4444)", borderColor: "rgba(239,68,68,0.3)" }}
-                                onClick={() => handleDeleteTextLayer(selectedLayer.id)}
-                            >
-                                <Trash2 size={14} /> Metin Katmanını Sil
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            <h3>Animasyon Ayarları</h3>
-
-                            {selectedLayer && selectedAnimation ? (
-                                <>
-                                    <p style={{ fontSize: "0.9rem", fontWeight: 600, marginBottom: 16, color: "var(--accent-purple)" }}>
-                                        {selectedLayer.name}
-                                    </p>
-
-                                    <div className="settings-group">
-                                        <label>Animasyon Tipi</label>
-                                        <select
-                                            value={selectedAnimation.animationType}
-                                            onChange={(e) => updateAnimation(selectedLayer.id, { animationType: e.target.value })}
-                                        >
-                                            {ANIMATION_TYPES.map((t) => (
-                                                <option key={t.value} value={t.value}>{t.label}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div className="settings-group">
-                                        <label>Süre: {selectedAnimation.durationMs}ms</label>
-                                        <input type="range" min={100} max={5000} step={100}
-                                            value={selectedAnimation.durationMs}
-                                            onChange={(e) => updateAnimation(selectedLayer.id, { durationMs: parseInt(e.target.value) })} />
-                                    </div>
-
-                                    <div className="settings-group">
-                                        <label>Gecikme: {selectedAnimation.delayMs}ms</label>
-                                        <input type="range" min={0} max={10000} step={100}
-                                            value={selectedAnimation.delayMs}
-                                            onChange={(e) => updateAnimation(selectedLayer.id, { delayMs: parseInt(e.target.value) })} />
-                                    </div>
-
-                                    <div className="settings-group">
-                                        <label>Easing</label>
-                                        <select
-                                            value={selectedAnimation.easing}
-                                            onChange={(e) => updateAnimation(selectedLayer.id, { easing: e.target.value })}
-                                        >
-                                            {EASING_OPTIONS.map((e) => (
-                                                <option key={e.value} value={e.value}>{e.label}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div className="settings-group">
-                                        <label>Opaklık: {selectedAnimation.fromOpacity} → {selectedAnimation.toOpacity}</label>
-                                        <div style={{ display: "flex", gap: 8 }}>
-                                            <input type="range" min={0} max={1} step={0.1}
-                                                value={selectedAnimation.fromOpacity}
-                                                onChange={(e) => updateAnimation(selectedLayer.id, { fromOpacity: parseFloat(e.target.value) })} />
-                                            <input type="range" min={0} max={1} step={0.1}
-                                                value={selectedAnimation.toOpacity}
-                                                onChange={(e) => updateAnimation(selectedLayer.id, { toOpacity: parseFloat(e.target.value) })} />
-                                        </div>
-                                    </div>
-
-                                    <div className="settings-group">
-                                        <label>Ölçek: {selectedAnimation.fromScale}× → {selectedAnimation.toScale}×</label>
-                                        <div style={{ display: "flex", gap: 8 }}>
-                                            <input type="range" min={0} max={2} step={0.1}
-                                                value={selectedAnimation.fromScale}
-                                                onChange={(e) => updateAnimation(selectedLayer.id, { fromScale: parseFloat(e.target.value) })} />
-                                            <input type="range" min={0} max={2} step={0.1}
-                                                value={selectedAnimation.toScale}
-                                                onChange={(e) => updateAnimation(selectedLayer.id, { toScale: parseFloat(e.target.value) })} />
-                                        </div>
-                                    </div>
-                                </>
-                            ) : selectedLayer ? (
-                                <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                                    Bu katman için animasyon ayarı yok.
-                                </p>
-                            ) : (
-                                <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                                    Ayarları görmek için bir katman seçin.
-                                </p>
-                            )}
-
-                        </>
-                    )}
-                </div>
-            </div>
-
-            {/* ═══ Bottom Tabs: Timeline / AI / Settings ═══ */}
-            <div className="bottom-tabs-container">
-                <div className="bottom-tabs-header">
-                    <button
-                        className={`bottom-tab ${bottomTab === 'timeline' ? 'active' : ''}`}
-                        onClick={() => setBottomTab('timeline')}
-                    >
-                        <Play size={14} /> Zaman Çizelgesi
-                    </button>
-                    <button
-                        className={`bottom-tab ${bottomTab === 'ai' ? 'active' : ''}`}
-                        onClick={() => setBottomTab('ai')}
-                    >
-                        <Sparkles size={14} /> AI Asistan
-                    </button>
-                    <button
-                        className={`bottom-tab ${bottomTab === 'settings' ? 'active' : ''}`}
-                        onClick={() => setBottomTab('settings')}
-                    >
-                        <Settings2 size={14} /> Render Ayarları
-                    </button>
-                </div>
-
-                {/* Timeline Tab */}
-                {bottomTab === 'timeline' && (
-                    <div className="editor-timeline">
-                        <div className="timeline-header">
-                            <div className="timeline-labels">
-                                {(() => {
-                                    const renderedGroups = new Set<string>();
-                                    return allLayers.map((layer, index) => {
-                                        const groupName = (layer.metadata as { groupName?: string })?.groupName;
-                                        const elements: React.ReactNode[] = [];
-                                        if (groupName && !renderedGroups.has(groupName)) {
-                                            renderedGroups.add(groupName);
-                                            elements.push(
-                                                <div key={`tl-group-${groupName}`} className="timeline-label timeline-group-label">
-                                                    <FolderOpen size={11} />
-                                                    <span>{groupName}</span>
-                                                </div>
-                                            );
-                                        }
-                                        elements.push(
-                                            <div
-                                                key={layer.id}
-                                                className={`timeline-label ${selectedLayerId === layer.id ? "active" : ""} ${groupName ? "timeline-label-child" : ""}`}
-                                                onClick={() => selectLayer(layer.id)}
-                                            >
-                                                <div className="layer-color-dot" style={{ background: LAYER_COLORS[index % LAYER_COLORS.length] }} />
-                                                <span>{layer.name}</span>
-                                            </div>
-                                        );
-                                        return elements;
-                                    });
-                                })()}
-                            </div>
-                            <div className="timeline-tracks" ref={timelineRef} onClick={handleTimelineClick}>
-                                {/* Markers */}
-                                <div className="timeline-markers">
-                                    {Array.from({ length: Math.ceil(renderDuration / 1000) + 1 }, (_, i) => (
-                                        <div key={i} className="timeline-marker" style={{ left: `${timeToPercent(i * 1000)}%` }}>
-                                            <span>{i}s</span>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {/* Playhead */}
-                                <div className="timeline-playhead" style={{ left: `${timeToPercent(currentTime)}%` }} />
-
-                                {/* Bars */}
-                                {(() => {
-                                    const renderedGroups = new Set<string>();
-                                    return allLayers.map((layer, index) => {
-                                        const groupName = (layer.metadata as { groupName?: string })?.groupName;
-                                        const anim = layer.layerAnimations[0];
-                                        const elements: React.ReactNode[] = [];
-
-                                        if (groupName && !renderedGroups.has(groupName)) {
-                                            renderedGroups.add(groupName);
-                                            elements.push(
-                                                <div key={`tl-bar-group-${groupName}`} className="timeline-row timeline-group-row" />
-                                            );
-                                        }
-
-                                        if (!anim) {
-                                            elements.push(<div key={layer.id} className="timeline-row" />);
-                                        } else {
-                                            const left = timeToPercent(anim.delayMs);
-                                            const width = timeToPercent(anim.durationMs);
-                                            const color = LAYER_COLORS[index % LAYER_COLORS.length];
-                                            elements.push(
-                                                <div key={layer.id} className="timeline-row">
-                                                    <div
-                                                        className={`timeline-bar ${selectedLayerId === layer.id ? "selected" : ""}`}
-                                                        style={{
-                                                            left: `${left}%`,
-                                                            width: `${Math.max(width, 1)}%`,
-                                                            background: `${color}cc`,
-                                                            borderColor: selectedLayerId === layer.id ? color : "transparent",
-                                                        }}
-                                                        onClick={(e) => { e.stopPropagation(); setSelectedLayerId(layer.id); }}
-                                                        onMouseDown={(e) => handleBarDrag(layer.id, "move", e)}
-                                                    >
-                                                        <span className="timeline-bar-label">
-                                                            {ANIMATION_TYPES.find((t) => t.value === anim.animationType)?.label || anim.animationType}
-                                                        </span>
-                                                        <div
-                                                            className="timeline-bar-handle"
-                                                            onMouseDown={(e) => handleBarDrag(layer.id, "resize", e)}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            );
-                                        }
-                                        return elements;
-                                    });
-                                })()}
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* AI Tab */}
-                {bottomTab === 'ai' && (
-                    <div className="ai-panel">
-                        <div className="ai-prompt-row">
-                            <textarea
-                                className="ai-prompt-input"
-                                placeholder='Örn: "Logo katmanını soldan kaydırarak getir, alt yazıyı fade-in ile göster, dramatik olsun..."'
-                                value={aiPrompt}
-                                onChange={(e) => setAiPrompt(e.target.value)}
-                                rows={1}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter" && !e.shiftKey) {
-                                        e.preventDefault();
-                                        handleAIPrompt();
-                                    }
-                                }}
-                            />
-                            <button className="btn-ai" onClick={handleAIPrompt} disabled={aiLoading || !aiPrompt.trim()}>
-                                {aiLoading ? (
-                                    <><span className="spinner" style={{ width: 16, height: 16 }} /> Düşünüyor...</>
-                                ) : (
-                                    <><Sparkles size={16} /> AI ile Animasyonla</>
-                                )}
-                            </button>
-                        </div>
-
-                        <div className="ai-templates">
-                            {AI_TEMPLATES.map((template) => (
-                                <button key={template} className="ai-template-chip" onClick={() => setAiPrompt(template)}>
-                                    {template}
-                                </button>
-                            ))}
-                        </div>
-
-                        {aiSuggestions && (
-                            <div style={{
-                                marginTop: 12, padding: 12, borderRadius: "var(--radius-md)",
-                                background: "rgba(139, 92, 246, 0.08)", border: "1px solid rgba(139, 92, 246, 0.2)"
+                        {/* Playback */}
+                        <div className="canvas-controls">
+                            <button onClick={() => {
+                                if (isPlaying) {
+                                    setIsPlaying(false);
+                                    if (audioRef.current) audioRef.current.pause();
+                                } else {
+                                    if (currentTime >= renderDuration) setCurrentTime(0);
+                                    setIsPlaying(true);
+                                }
                             }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                                    <span style={{ fontWeight: 600, fontSize: "0.85rem" }}>
-                                        AI Önerileri ({aiSuggestions.length} katman)
-                                    </span>
-                                    <div style={{ display: "flex", gap: 8 }}>
-                                        <button className="btn btn-secondary" style={{ padding: "4px 12px", fontSize: "0.8rem" }}
-                                            onClick={() => setAiSuggestions(null)}>İptal</button>
-                                        <button className="btn btn-primary" style={{ padding: "4px 12px", fontSize: "0.8rem" }}
-                                            onClick={applyAISuggestions}>✓ Uygula</button>
-                                    </div>
-                                </div>
-                                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                                    {aiSuggestions.map((s, i) => (
-                                        <div key={i} style={{
-                                            padding: "6px 10px", borderRadius: "var(--radius-sm)",
-                                            background: "rgba(255,255,255,0.05)", fontSize: "0.75rem",
-                                            border: "1px solid var(--border-glass)"
-                                        }}>
-                                            <strong>{s.layerName}</strong>: {s.animationType} ({s.durationMs}ms)
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {project.promptHistory && project.promptHistory.length > 0 && (
-                            <details style={{ marginTop: 8 }}>
-                                <summary style={{ cursor: "pointer", fontSize: "0.75rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 4 }}>
-                                    <ChevronDown size={14} /> Önceki Promptlar ({project.promptHistory.length})
-                                </summary>
-                                <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
-                                    {project.promptHistory.map((h) => (
-                                        <button key={h.id} className="ai-template-chip"
-                                            style={{ textAlign: "left", justifyContent: "flex-start" }}
-                                            onClick={() => setAiPrompt(h.prompt)}>
-                                            {h.applied ? "✓ " : ""}{h.prompt.slice(0, 80)}{h.prompt.length > 80 ? "..." : ""}
-                                        </button>
-                                    ))}
-                                </div>
-                            </details>
-                        )}
+                                {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+                            </button>
+                            <button onClick={() => {
+                                setIsPlaying(false); setCurrentTime(0);
+                                if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
+                            }}>
+                                <RotateCcw size={18} />
+                            </button>
+                            <button
+                                onClick={() => setIsLooping(!isLooping)}
+                                title={isLooping ? "Loop Kapat" : "Loop Aç"}
+                                style={{ color: isLooping ? "var(--accent-purple)" : "var(--text-muted)" }}
+                            >
+                                <Repeat2 size={18} />
+                            </button>
+                            {audioUrl && <span style={{ fontSize: '0.75rem', color: 'var(--accent-purple)', marginLeft: 4 }}>🔊 Ses</span>}
+                            <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", minWidth: 80, textAlign: "center" }}>
+                                {(currentTime / 1000).toFixed(1)}s / {(renderDuration / 1000).toFixed(1)}s
+                            </span>
+                        </div>
                     </div>
-                )}
 
-                {/* Settings Tab */}
-                {bottomTab === 'settings' && (
-                    <div className="bottom-tab-content">
-                        <div className="render-settings-body">
-                            <div className="render-settings-group">
-                                <label>Çözünürlük Presetleri</label>
-                                <div className="resolution-presets">
-                                    {RESOLUTION_PRESETS.map((p) => (
-                                        <button
-                                            key={p.label}
-                                            className={`preset-chip ${renderWidth === p.w && renderHeight === p.h ? "active" : ""}`}
-                                            onClick={() => { setRenderWidth(p.w); setRenderHeight(p.h); }}
-                                        >
-                                            {p.label}
-                                            <span>{p.w}×{p.h}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
+                    {/* Right — Settings */}
+                    <div className="editor-settings">
+                        {/* Text Layer Editing */}
+                        {selectedLayer && selectedLayer.isTextLayer ? (
+                            <>
+                                <h3>Metin Ayarları</h3>
+                                <p style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: 12, color: "var(--accent-purple)" }}>
+                                    <Type size={14} style={{ marginRight: 4, verticalAlign: -2 }} />
+                                    {selectedLayer.name}
+                                </p>
 
-                            <div className="render-settings-row">
-                                <div className="render-settings-group">
-                                    <label>Genişlik (px)</label>
-                                    <input
-                                        type="number" min={100} max={4096}
-                                        value={renderWidth}
-                                        onChange={(e) => setRenderWidth(parseInt(e.target.value) || 100)}
+                                <div className="settings-group">
+                                    <label>Metin İçeriği</label>
+                                    <textarea
+                                        className="input"
+                                        rows={3}
+                                        value={editingTextLayerId === selectedLayer.id ? editingTextContent : (selectedLayer.textContent || "")}
+                                        onChange={(e) => handleTextContentChange(selectedLayer.id, e.target.value)}
+                                        onFocus={() => {
+                                            setEditingTextLayerId(selectedLayer.id);
+                                            setEditingTextContent(selectedLayer.textContent || "");
+                                        }}
+                                        style={{ resize: "vertical", fontSize: "0.85rem" }}
                                     />
                                 </div>
-                                <div className="render-settings-group">
-                                    <label>Yükseklik (px)</label>
-                                    <input
-                                        type="number" min={100} max={4096}
-                                        value={renderHeight}
-                                        onChange={(e) => setRenderHeight(parseInt(e.target.value) || 100)}
-                                    />
-                                </div>
-                                <div className="render-settings-group">
-                                    <label>FPS</label>
-                                    <select value={renderFps} onChange={(e) => setRenderFps(parseInt(e.target.value))}>
-                                        <option value={24}>24</option>
-                                        <option value={25}>25</option>
-                                        <option value={30}>30</option>
-                                        <option value={60}>60</option>
+
+                                <div className="settings-group">
+                                    <label>Font</label>
+                                    <select
+                                        value={selectedLayer.fontFamily || "Inter"}
+                                        onChange={(e) => handleUpdateTextLayer(selectedLayer.id, { fontFamily: e.target.value })}
+                                    >
+                                        {FONT_OPTIONS.map((f) => (
+                                            <option key={f} value={f}>{f}</option>
+                                        ))}
                                     </select>
                                 </div>
-                            </div>
 
-                            <div className="render-settings-row">
-                                <div className="render-settings-group">
-                                    <label>Süre: {(renderDuration / 1000).toFixed(1)}s</label>
-                                    <input
-                                        type="range" min={1000} max={30000} step={500}
-                                        value={renderDuration}
-                                        onChange={(e) => setRenderDuration(parseInt(e.target.value))}
-                                    />
+                                <div className="settings-group">
+                                    <label>Boyut: {selectedLayer.fontSize || 48}px</label>
+                                    <input type="range" min={12} max={200} step={2}
+                                        value={selectedLayer.fontSize || 48}
+                                        onChange={(e) => handleUpdateTextLayer(selectedLayer.id, { fontSize: parseInt(e.target.value) })} />
                                 </div>
-                                <div className="render-settings-group">
-                                    <label>Arka Plan Türü</label>
+
+                                <div className="settings-group">
+                                    <label>Renk</label>
+                                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                        <input
+                                            type="color"
+                                            value={selectedLayer.fontColor || "#FFFFFF"}
+                                            onChange={(e) => handleUpdateTextLayer(selectedLayer.id, { fontColor: e.target.value })}
+                                            style={{ width: 36, height: 28, padding: 0, border: "none", borderRadius: 4, cursor: "pointer" }}
+                                        />
+                                        <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                                            {selectedLayer.fontColor || "#FFFFFF"}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="settings-group">
+                                    <label>Hizalama</label>
                                     <div style={{ display: "flex", gap: 4 }}>
-                                        {(["solid", "gradient", "transparent"] as const).map((t) => (
+                                        {(["left", "center", "right"] as const).map((align) => (
                                             <button
-                                                key={t}
-                                                className={`btn btn-ghost ${bgType === t ? "active" : ""}`}
-                                                style={{ padding: "5px 10px", flex: 1, fontSize: "0.75rem" }}
-                                                onClick={() => setBgType(t)}
+                                                key={align}
+                                                className={`btn btn-ghost ${selectedLayer.textAlign === align ? "active" : ""}`}
+                                                style={{ padding: "6px 12px", flex: 1 }}
+                                                onClick={() => handleUpdateTextLayer(selectedLayer.id, { textAlign: align })}
                                             >
-                                                {t === "solid" ? "■ Düz" : t === "gradient" ? "◓ Gradient" : "□ Şeffaf"}
+                                                {align === "left" ? <AlignLeft size={14} /> : align === "center" ? <AlignCenter size={14} /> : <AlignRight size={14} />}
                                             </button>
                                         ))}
                                     </div>
                                 </div>
 
-                                {bgType === "solid" && (
-                                    <div className="render-settings-group">
-                                        <label>Renk</label>
-                                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                                            <input
-                                                type="color" value={renderBg}
-                                                onChange={(e) => setRenderBg(e.target.value)}
-                                                style={{ width: 36, height: 28, padding: 0, border: "none", borderRadius: 4, cursor: "pointer" }}
-                                            />
-                                            <input type="text" value={renderBg}
-                                                onChange={(e) => setRenderBg(e.target.value)}
-                                                style={{ flex: 1, padding: "4px 8px", background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-glass)", borderRadius: 4, color: "var(--text-primary)", fontSize: "0.8rem" }}
-                                            />
-                                        </div>
-                                    </div>
-                                )}
+                                <div className="settings-group">
+                                    <label>Kalınlık</label>
+                                    <select
+                                        value={selectedLayer.fontWeight || 600}
+                                        onChange={(e) => handleUpdateTextLayer(selectedLayer.id, { fontWeight: parseInt(e.target.value) })}
+                                    >
+                                        <option value={300}>Light (300)</option>
+                                        <option value={400}>Regular (400)</option>
+                                        <option value={500}>Medium (500)</option>
+                                        <option value={600}>Semibold (600)</option>
+                                        <option value={700}>Bold (700)</option>
+                                        <option value={800}>Extra Bold (800)</option>
+                                        <option value={900}>Black (900)</option>
+                                    </select>
+                                </div>
 
-                                {bgType === "gradient" && (
+                                <hr style={{ border: "none", borderTop: "1px solid var(--border-glass)", margin: "16px 0" }} />
+
+                                <h3>Animasyon Ayarları</h3>
+                                {selectedAnimation ? (
                                     <>
-                                        <div className="render-settings-group">
-                                            <label>Tür</label>
-                                            <div style={{ display: "flex", gap: 4 }}>
-                                                <button className={`btn btn-ghost ${bgGradient.type === "linear" ? "active" : ""}`}
-                                                    style={{ flex: 1, padding: "5px 10px", fontSize: "0.75rem" }}
-                                                    onClick={() => setBgGradient({ ...bgGradient, type: "linear" })}>Linear</button>
-                                                <button className={`btn btn-ghost ${bgGradient.type === "radial" ? "active" : ""}`}
-                                                    style={{ flex: 1, padding: "5px 10px", fontSize: "0.75rem" }}
-                                                    onClick={() => setBgGradient({ ...bgGradient, type: "radial" })}>Radial</button>
-                                            </div>
+                                        <div className="settings-group">
+                                            <label>Animasyon Tipi</label>
+                                            <select
+                                                value={selectedAnimation.animationType}
+                                                onChange={(e) => updateAnimation(selectedLayer.id, { animationType: e.target.value })}
+                                            >
+                                                {ANIMATION_TYPES.map((t) => (
+                                                    <option key={t.value} value={t.value}>{t.label}</option>
+                                                ))}
+                                            </select>
                                         </div>
-                                        <div className="render-settings-row">
-                                            <div className="render-settings-group">
-                                                <label>Renk 1</label>
-                                                <input type="color" value={bgGradient.color1}
-                                                    onChange={(e) => setBgGradient({ ...bgGradient, color1: e.target.value })}
-                                                    style={{ width: "100%", height: 28, padding: 0, border: "none", borderRadius: 4, cursor: "pointer" }} />
-                                            </div>
-                                            <div className="render-settings-group">
-                                                <label>Renk 2</label>
-                                                <input type="color" value={bgGradient.color2}
-                                                    onChange={(e) => setBgGradient({ ...bgGradient, color2: e.target.value })}
-                                                    style={{ width: "100%", height: 28, padding: 0, border: "none", borderRadius: 4, cursor: "pointer" }} />
-                                            </div>
+                                        <div className="settings-group">
+                                            <label>Süre: {selectedAnimation.durationMs}ms</label>
+                                            <input type="range" min={100} max={5000} step={100}
+                                                value={selectedAnimation.durationMs}
+                                                onChange={(e) => updateAnimation(selectedLayer.id, { durationMs: parseInt(e.target.value) })} />
                                         </div>
-                                        {bgGradient.type === "linear" && (
-                                            <div className="render-settings-group">
-                                                <label>Açı: {bgGradient.angle}°</label>
-                                                <input type="range" min={0} max={360} step={5}
-                                                    value={bgGradient.angle}
-                                                    onChange={(e) => setBgGradient({ ...bgGradient, angle: parseInt(e.target.value) })} />
-                                            </div>
-                                        )}
-                                        <div style={{
-                                            height: 32, borderRadius: 6, marginTop: 4,
-                                            background: bgGradient.type === "radial"
-                                                ? `radial-gradient(circle, ${bgGradient.color1}, ${bgGradient.color2})`
-                                                : `linear-gradient(${bgGradient.angle}deg, ${bgGradient.color1}, ${bgGradient.color2})`
-                                        }} />
+                                        <div className="settings-group">
+                                            <label>Gecikme: {selectedAnimation.delayMs}ms</label>
+                                            <input type="range" min={0} max={10000} step={100}
+                                                value={selectedAnimation.delayMs}
+                                                onChange={(e) => updateAnimation(selectedLayer.id, { delayMs: parseInt(e.target.value) })} />
+                                        </div>
                                     </>
+                                ) : (
+                                    <p style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>Animasyon ayarı yok.</p>
                                 )}
 
-                                {bgType === "transparent" && (
-                                    <div style={{ padding: 8, fontSize: "0.78rem", color: "var(--text-muted)", background: "rgba(255,255,255,0.03)", borderRadius: 6 }}>
-                                        Şeffaf arka plan, WebM formatında alfa kanalı ile desteği aktif olacaktır.
-                                    </div>
+                                <button
+                                    className="btn btn-ghost"
+                                    style={{ width: "100%", marginTop: 16, color: "var(--accent-red, #ef4444)", borderColor: "rgba(239,68,68,0.3)" }}
+                                    onClick={() => handleDeleteTextLayer(selectedLayer.id)}
+                                >
+                                    <Trash2 size={14} /> Metin Katmanını Sil
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <h3>Animasyon Ayarları</h3>
+
+                                {selectedLayer && selectedAnimation ? (
+                                    <>
+                                        <p style={{ fontSize: "0.9rem", fontWeight: 600, marginBottom: 16, color: "var(--accent-purple)" }}>
+                                            {selectedLayer.name}
+                                        </p>
+
+                                        <div className="settings-group">
+                                            <label>Animasyon Tipi</label>
+                                            <select
+                                                value={selectedAnimation.animationType}
+                                                onChange={(e) => updateAnimation(selectedLayer.id, { animationType: e.target.value })}
+                                            >
+                                                {ANIMATION_TYPES.map((t) => (
+                                                    <option key={t.value} value={t.value}>{t.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="settings-group">
+                                            <label>Süre: {selectedAnimation.durationMs}ms</label>
+                                            <input type="range" min={100} max={5000} step={100}
+                                                value={selectedAnimation.durationMs}
+                                                onChange={(e) => updateAnimation(selectedLayer.id, { durationMs: parseInt(e.target.value) })} />
+                                        </div>
+
+                                        <div className="settings-group">
+                                            <label>Gecikme: {selectedAnimation.delayMs}ms</label>
+                                            <input type="range" min={0} max={10000} step={100}
+                                                value={selectedAnimation.delayMs}
+                                                onChange={(e) => updateAnimation(selectedLayer.id, { delayMs: parseInt(e.target.value) })} />
+                                        </div>
+
+                                        <div className="settings-group">
+                                            <label>Easing</label>
+                                            <select
+                                                value={selectedAnimation.easing}
+                                                onChange={(e) => updateAnimation(selectedLayer.id, { easing: e.target.value })}
+                                            >
+                                                {EASING_OPTIONS.map((e) => (
+                                                    <option key={e.value} value={e.value}>{e.label}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="settings-group">
+                                            <label>Opaklık: {selectedAnimation.fromOpacity} → {selectedAnimation.toOpacity}</label>
+                                            <div style={{ display: "flex", gap: 8 }}>
+                                                <input type="range" min={0} max={1} step={0.1}
+                                                    value={selectedAnimation.fromOpacity}
+                                                    onChange={(e) => updateAnimation(selectedLayer.id, { fromOpacity: parseFloat(e.target.value) })} />
+                                                <input type="range" min={0} max={1} step={0.1}
+                                                    value={selectedAnimation.toOpacity}
+                                                    onChange={(e) => updateAnimation(selectedLayer.id, { toOpacity: parseFloat(e.target.value) })} />
+                                            </div>
+                                        </div>
+
+                                        <div className="settings-group">
+                                            <label>Ölçek: {selectedAnimation.fromScale}× → {selectedAnimation.toScale}×</label>
+                                            <div style={{ display: "flex", gap: 8 }}>
+                                                <input type="range" min={0} max={2} step={0.1}
+                                                    value={selectedAnimation.fromScale}
+                                                    onChange={(e) => updateAnimation(selectedLayer.id, { fromScale: parseFloat(e.target.value) })} />
+                                                <input type="range" min={0} max={2} step={0.1}
+                                                    value={selectedAnimation.toScale}
+                                                    onChange={(e) => updateAnimation(selectedLayer.id, { toScale: parseFloat(e.target.value) })} />
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : selectedLayer ? (
+                                    <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                                        Bu katman için animasyon ayarı yok.
+                                    </p>
+                                ) : (
+                                    <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                                        Ayarları görmek için bir katman seçin.
+                                    </p>
                                 )}
+
+                            </>
+                        )}
+                    </div>
+                </div>
+
+                {/* ═══ Bottom Tabs: Timeline / AI / Settings ═══ */}
+                <div className="bottom-tabs-container">
+                    <div className="bottom-tabs-header">
+                        <button
+                            className={`bottom-tab ${bottomTab === 'timeline' ? 'active' : ''}`}
+                            onClick={() => setBottomTab('timeline')}
+                        >
+                            <Play size={14} /> Zaman Çizelgesi
+                        </button>
+                        <button
+                            className={`bottom-tab ${bottomTab === 'ai' ? 'active' : ''}`}
+                            onClick={() => setBottomTab('ai')}
+                        >
+                            <Sparkles size={14} /> AI Asistan
+                        </button>
+                        <button
+                            className={`bottom-tab ${bottomTab === 'settings' ? 'active' : ''}`}
+                            onClick={() => setBottomTab('settings')}
+                        >
+                            <Settings2 size={14} /> Render Ayarları
+                        </button>
+                    </div>
+
+                    {/* Timeline Tab */}
+                    {bottomTab === 'timeline' && (
+                        <div className="editor-timeline">
+                            <div className="timeline-header">
+                                <div className="timeline-labels">
+                                    {(() => {
+                                        const renderedGroups = new Set<string>();
+                                        return allLayers.map((layer, index) => {
+                                            const groupName = (layer.metadata as { groupName?: string })?.groupName;
+                                            const elements: React.ReactNode[] = [];
+                                            if (groupName && !renderedGroups.has(groupName)) {
+                                                renderedGroups.add(groupName);
+                                                elements.push(
+                                                    <div key={`tl-group-${groupName}`} className="timeline-label timeline-group-label">
+                                                        <FolderOpen size={11} />
+                                                        <span>{groupName}</span>
+                                                    </div>
+                                                );
+                                            }
+                                            elements.push(
+                                                <div
+                                                    key={layer.id}
+                                                    className={`timeline-label ${selectedLayerId === layer.id ? "active" : ""} ${groupName ? "timeline-label-child" : ""}`}
+                                                    onClick={() => selectLayer(layer.id)}
+                                                >
+                                                    <div className="layer-color-dot" style={{ background: LAYER_COLORS[index % LAYER_COLORS.length] }} />
+                                                    <span>{layer.name}</span>
+                                                </div>
+                                            );
+                                            return elements;
+                                        });
+                                    })()}
+                                </div>
+                                <div className="timeline-tracks" ref={timelineRef} onClick={handleTimelineClick}>
+                                    {/* Markers */}
+                                    <div className="timeline-markers">
+                                        {Array.from({ length: Math.ceil(renderDuration / 1000) + 1 }, (_, i) => (
+                                            <div key={i} className="timeline-marker" style={{ left: `${timeToPercent(i * 1000)}%` }}>
+                                                <span>{i}s</span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Playhead */}
+                                    <div className="timeline-playhead" style={{ left: `${timeToPercent(currentTime)}%` }} />
+
+                                    {/* Bars */}
+                                    {(() => {
+                                        const renderedGroups = new Set<string>();
+                                        return allLayers.map((layer, index) => {
+                                            const groupName = (layer.metadata as { groupName?: string })?.groupName;
+                                            const anim = layer.layerAnimations[0];
+                                            const elements: React.ReactNode[] = [];
+
+                                            if (groupName && !renderedGroups.has(groupName)) {
+                                                renderedGroups.add(groupName);
+                                                elements.push(
+                                                    <div key={`tl-bar-group-${groupName}`} className="timeline-row timeline-group-row" />
+                                                );
+                                            }
+
+                                            if (!anim) {
+                                                elements.push(<div key={layer.id} className="timeline-row" />);
+                                            } else {
+                                                const left = timeToPercent(anim.delayMs);
+                                                const width = timeToPercent(anim.durationMs);
+                                                const color = LAYER_COLORS[index % LAYER_COLORS.length];
+                                                elements.push(
+                                                    <div key={layer.id} className="timeline-row">
+                                                        <div
+                                                            className={`timeline-bar ${selectedLayerId === layer.id ? "selected" : ""}`}
+                                                            style={{
+                                                                left: `${left}%`,
+                                                                width: `${Math.max(width, 1)}%`,
+                                                                background: `${color}cc`,
+                                                                borderColor: selectedLayerId === layer.id ? color : "transparent",
+                                                            }}
+                                                            onClick={(e) => { e.stopPropagation(); setSelectedLayerId(layer.id); }}
+                                                            onMouseDown={(e) => handleBarDrag(layer.id, "move", e)}
+                                                        >
+                                                            <span className="timeline-bar-label">
+                                                                {ANIMATION_TYPES.find((t) => t.value === anim.animationType)?.label || anim.animationType}
+                                                            </span>
+                                                            <div
+                                                                className="timeline-bar-handle"
+                                                                onMouseDown={(e) => handleBarDrag(layer.id, "resize", e)}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+                                            return elements;
+                                        });
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* AI Tab */}
+                    {bottomTab === 'ai' && (
+                        <div className="ai-panel">
+                            <div className="ai-prompt-row">
+                                <textarea
+                                    className="ai-prompt-input"
+                                    placeholder='Örn: "Logo katmanını soldan kaydırarak getir, alt yazıyı fade-in ile göster, dramatik olsun..."'
+                                    value={aiPrompt}
+                                    onChange={(e) => setAiPrompt(e.target.value)}
+                                    rows={1}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" && !e.shiftKey) {
+                                            e.preventDefault();
+                                            handleAIPrompt();
+                                        }
+                                    }}
+                                />
+                                <button className="btn-ai" onClick={handleAIPrompt} disabled={aiLoading || !aiPrompt.trim()}>
+                                    {aiLoading ? (
+                                        <><span className="spinner" style={{ width: 16, height: 16 }} /> Düşünüyor...</>
+                                    ) : (
+                                        <><Sparkles size={16} /> AI ile Animasyonla</>
+                                    )}
+                                </button>
                             </div>
 
-                            <button className="btn btn-primary" style={{ width: "100%", marginTop: 8 }} onClick={saveRenderSettings}>
-                                <Save size={16} /> Ayarları Kaydet & Uygula
-                            </button>
+                            <div className="ai-templates">
+                                {AI_TEMPLATES.map((template) => (
+                                    <button key={template} className="ai-template-chip" onClick={() => setAiPrompt(template)}>
+                                        {template}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {aiSuggestions && (
+                                <div style={{
+                                    marginTop: 12, padding: 12, borderRadius: "var(--radius-md)",
+                                    background: "rgba(139, 92, 246, 0.08)", border: "1px solid rgba(139, 92, 246, 0.2)"
+                                }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                                        <span style={{ fontWeight: 600, fontSize: "0.85rem" }}>
+                                            AI Önerileri ({aiSuggestions.length} katman)
+                                        </span>
+                                        <div style={{ display: "flex", gap: 8 }}>
+                                            <button className="btn btn-secondary" style={{ padding: "4px 12px", fontSize: "0.8rem" }}
+                                                onClick={() => setAiSuggestions(null)}>İptal</button>
+                                            <button className="btn btn-primary" style={{ padding: "4px 12px", fontSize: "0.8rem" }}
+                                                onClick={applyAISuggestions}>✓ Uygula</button>
+                                        </div>
+                                    </div>
+                                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                        {aiSuggestions.map((s, i) => (
+                                            <div key={i} style={{
+                                                padding: "6px 10px", borderRadius: "var(--radius-sm)",
+                                                background: "rgba(255,255,255,0.05)", fontSize: "0.75rem",
+                                                border: "1px solid var(--border-glass)"
+                                            }}>
+                                                <strong>{s.layerName}</strong>: {s.animationType} ({s.durationMs}ms)
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {project.promptHistory && project.promptHistory.length > 0 && (
+                                <details style={{ marginTop: 8 }}>
+                                    <summary style={{ cursor: "pointer", fontSize: "0.75rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 4 }}>
+                                        <ChevronDown size={14} /> Önceki Promptlar ({project.promptHistory.length})
+                                    </summary>
+                                    <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+                                        {project.promptHistory.map((h) => (
+                                            <button key={h.id} className="ai-template-chip"
+                                                style={{ textAlign: "left", justifyContent: "flex-start" }}
+                                                onClick={() => setAiPrompt(h.prompt)}>
+                                                {h.applied ? "✓ " : ""}{h.prompt.slice(0, 80)}{h.prompt.length > 80 ? "..." : ""}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </details>
+                            )}
                         </div>
-                    </div>
-                )}
+                    )}
+
+                    {/* Settings Tab */}
+                    {bottomTab === 'settings' && (
+                        <div className="bottom-tab-content">
+                            <div className="render-settings-body">
+                                <div className="render-settings-group">
+                                    <label>Çözünürlük Presetleri</label>
+                                    <div className="resolution-presets">
+                                        {RESOLUTION_PRESETS.map((p) => (
+                                            <button
+                                                key={p.label}
+                                                className={`preset-chip ${renderWidth === p.w && renderHeight === p.h ? "active" : ""}`}
+                                                onClick={() => { setRenderWidth(p.w); setRenderHeight(p.h); }}
+                                            >
+                                                {p.label}
+                                                <span>{p.w}×{p.h}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="render-settings-row">
+                                    <div className="render-settings-group">
+                                        <label>Genişlik (px)</label>
+                                        <input
+                                            type="number" min={100} max={4096}
+                                            value={renderWidth}
+                                            onChange={(e) => setRenderWidth(parseInt(e.target.value) || 100)}
+                                        />
+                                    </div>
+                                    <div className="render-settings-group">
+                                        <label>Yükseklik (px)</label>
+                                        <input
+                                            type="number" min={100} max={4096}
+                                            value={renderHeight}
+                                            onChange={(e) => setRenderHeight(parseInt(e.target.value) || 100)}
+                                        />
+                                    </div>
+                                    <div className="render-settings-group">
+                                        <label>FPS</label>
+                                        <select value={renderFps} onChange={(e) => setRenderFps(parseInt(e.target.value))}>
+                                            <option value={24}>24</option>
+                                            <option value={25}>25</option>
+                                            <option value={30}>30</option>
+                                            <option value={60}>60</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="render-settings-row">
+                                    <div className="render-settings-group">
+                                        <label>Süre: {(renderDuration / 1000).toFixed(1)}s</label>
+                                        <input
+                                            type="range" min={1000} max={30000} step={500}
+                                            value={renderDuration}
+                                            onChange={(e) => setRenderDuration(parseInt(e.target.value))}
+                                        />
+                                    </div>
+                                    <div className="render-settings-group">
+                                        <label>Arka Plan Türü</label>
+                                        <div style={{ display: "flex", gap: 4 }}>
+                                            {(["solid", "gradient", "transparent"] as const).map((t) => (
+                                                <button
+                                                    key={t}
+                                                    className={`btn btn-ghost ${bgType === t ? "active" : ""}`}
+                                                    style={{ padding: "5px 10px", flex: 1, fontSize: "0.75rem" }}
+                                                    onClick={() => setBgType(t)}
+                                                >
+                                                    {t === "solid" ? "■ Düz" : t === "gradient" ? "◓ Gradient" : "□ Şeffaf"}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {bgType === "solid" && (
+                                        <div className="render-settings-group">
+                                            <label>Renk</label>
+                                            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                                <input
+                                                    type="color" value={renderBg}
+                                                    onChange={(e) => setRenderBg(e.target.value)}
+                                                    style={{ width: 36, height: 28, padding: 0, border: "none", borderRadius: 4, cursor: "pointer" }}
+                                                />
+                                                <input type="text" value={renderBg}
+                                                    onChange={(e) => setRenderBg(e.target.value)}
+                                                    style={{ flex: 1, padding: "4px 8px", background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-glass)", borderRadius: 4, color: "var(--text-primary)", fontSize: "0.8rem" }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {bgType === "gradient" && (
+                                        <>
+                                            <div className="render-settings-group">
+                                                <label>Tür</label>
+                                                <div style={{ display: "flex", gap: 4 }}>
+                                                    <button className={`btn btn-ghost ${bgGradient.type === "linear" ? "active" : ""}`}
+                                                        style={{ flex: 1, padding: "5px 10px", fontSize: "0.75rem" }}
+                                                        onClick={() => setBgGradient({ ...bgGradient, type: "linear" })}>Linear</button>
+                                                    <button className={`btn btn-ghost ${bgGradient.type === "radial" ? "active" : ""}`}
+                                                        style={{ flex: 1, padding: "5px 10px", fontSize: "0.75rem" }}
+                                                        onClick={() => setBgGradient({ ...bgGradient, type: "radial" })}>Radial</button>
+                                                </div>
+                                            </div>
+                                            <div className="render-settings-row">
+                                                <div className="render-settings-group">
+                                                    <label>Renk 1</label>
+                                                    <input type="color" value={bgGradient.color1}
+                                                        onChange={(e) => setBgGradient({ ...bgGradient, color1: e.target.value })}
+                                                        style={{ width: "100%", height: 28, padding: 0, border: "none", borderRadius: 4, cursor: "pointer" }} />
+                                                </div>
+                                                <div className="render-settings-group">
+                                                    <label>Renk 2</label>
+                                                    <input type="color" value={bgGradient.color2}
+                                                        onChange={(e) => setBgGradient({ ...bgGradient, color2: e.target.value })}
+                                                        style={{ width: "100%", height: 28, padding: 0, border: "none", borderRadius: 4, cursor: "pointer" }} />
+                                                </div>
+                                            </div>
+                                            {bgGradient.type === "linear" && (
+                                                <div className="render-settings-group">
+                                                    <label>Açı: {bgGradient.angle}°</label>
+                                                    <input type="range" min={0} max={360} step={5}
+                                                        value={bgGradient.angle}
+                                                        onChange={(e) => setBgGradient({ ...bgGradient, angle: parseInt(e.target.value) })} />
+                                                </div>
+                                            )}
+                                            <div style={{
+                                                height: 32, borderRadius: 6, marginTop: 4,
+                                                background: bgGradient.type === "radial"
+                                                    ? `radial-gradient(circle, ${bgGradient.color1}, ${bgGradient.color2})`
+                                                    : `linear-gradient(${bgGradient.angle}deg, ${bgGradient.color1}, ${bgGradient.color2})`
+                                            }} />
+                                        </>
+                                    )}
+
+                                    {bgType === "transparent" && (
+                                        <div style={{ padding: 8, fontSize: "0.78rem", color: "var(--text-muted)", background: "rgba(255,255,255,0.03)", borderRadius: 6 }}>
+                                            Şeffaf arka plan, WebM formatında alfa kanalı ile desteği aktif olacaktır.
+                                        </div>
+                                    )}
+                                </div>
+
+                                <button className="btn btn-primary" style={{ width: "100%", marginTop: 8 }} onClick={saveRenderSettings}>
+                                    <Save size={16} /> Ayarları Kaydet & Uygula
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
