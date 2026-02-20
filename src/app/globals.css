@@ -1429,6 +1429,13 @@ body {
   box-shadow: var(--shadow-card);
 }
 
+/* Inline SVG layers must scale to fit their container div */
+.canvas-svg-container svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 .canvas-controls {
   position: absolute;
   bottom: 16px;

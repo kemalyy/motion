@@ -25,20 +25,25 @@ export async function PUT(
             return NextResponse.json({ error: "Proje bulunamadı" }, { status: 404 });
         }
 
-        // body.updates = [{ layerId, x, y }]
-        const updates = body.updates as Array<{ layerId: string; x: number; y: number }>;
+        // body.updates = [{ layerId, x?, y?, width?, height? }]
+        const updates = body.updates as Array<{ layerId: string; x?: number; y?: number; width?: number; height?: number }>;
         if (!updates || updates.length === 0) {
             return NextResponse.json({ error: "Güncelleme verisi gerekli" }, { status: 400 });
         }
 
-        // Batch update positions
+        // Batch update positions and dimensions
         await Promise.all(
-            updates.map((u) =>
-                prisma.layer.update({
+            updates.map((u) => {
+                const data: Record<string, number> = {};
+                if (u.x !== undefined) data.x = u.x;
+                if (u.y !== undefined) data.y = u.y;
+                if (u.width !== undefined) data.width = u.width;
+                if (u.height !== undefined) data.height = u.height;
+                return prisma.layer.update({
                     where: { id: u.layerId },
-                    data: { x: u.x, y: u.y },
-                }),
-            ),
+                    data,
+                });
+            }),
         );
 
         return NextResponse.json({ ok: true });

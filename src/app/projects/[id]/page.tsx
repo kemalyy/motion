@@ -506,6 +506,57 @@ export default function EditorPage() {
         } catch { /* silent fail, local state is updated */ }
     };
 
+    // Update layer position from input fields  
+    const handleUpdateLayerPosition = async (layerId: string, updates: { x?: number; y?: number; width?: number; height?: number }) => {
+        setProject(prev => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                sourceFiles: prev.sourceFiles.map(sf => ({
+                    ...sf,
+                    layers: sf.layers.map(l =>
+                        l.id === layerId ? { ...l, ...updates } : l
+                    ),
+                })),
+            };
+        });
+        try {
+            await fetch(`/api/projects/${projectId}/layers/position`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    updates: [{ layerId, ...updates }],
+                }),
+            });
+        } catch { /* silent */ }
+    };
+
+    // Ctrl+Scroll zoom on canvas
+    const handleCanvasWheel = (e: React.WheelEvent) => {
+        if (!e.ctrlKey && !e.metaKey) return;
+        e.preventDefault();
+        if (!selectedLayerId) return;
+        const delta = e.deltaY > 0 ? 0.95 : 1.05; // scroll down = shrink, up = grow
+        setProject(prev => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                sourceFiles: prev.sourceFiles.map(sf => ({
+                    ...sf,
+                    layers: sf.layers.map(l => {
+                        if (l.id !== selectedLayerId) return l;
+                        const newW = Math.round(l.width * delta);
+                        const newH = Math.round(l.height * delta);
+                        // Keep centered while scaling
+                        const dx = (l.width - newW) / 2;
+                        const dy = (l.height - newH) / 2;
+                        return { ...l, width: newW, height: newH, x: l.x + dx, y: l.y + dy };
+                    }),
+                })),
+            };
+        });
+    };
+
     const handleDeleteTextLayer = async (layerId: string) => {
         try {
             const res = await fetch(`/api/projects/${projectId}/text-layers/${layerId}`, {
@@ -813,7 +864,7 @@ export default function EditorPage() {
                                     <div
                                         key={layer.id}
                                         className={`layer-item ${selectedLayerId === layer.id ? "active" : ""} ${dragLayerId === layer.id ? "dragging" : ""} ${isChild ? "layer-child" : ""}`}
-                                        onClick={() => setSelectedLayerId(layer.id)}
+                                        onClick={() => selectLayer(layer.id)}
                                         draggable
                                         onDragStart={() => handleDragStart(layer.id)}
                                         onDragOver={handleDragOver}
@@ -883,12 +934,10 @@ export default function EditorPage() {
                             onMouseMove={handleCanvasMouseMove}
                             onMouseUp={handleCanvasMouseUp}
                             onMouseLeave={handleCanvasMouseUp}
+                            onWheel={handleCanvasWheel}
                         >
                             <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden" }}>
                                 {allLayers.map((layer) => {
-                                    const imgUrl = layerImageUrls.get(layer.id);
-                                    if (!imgUrl) return null;
-
                                     // Calculate preview position from layer x/y (use dragPos for active drag)
                                     const previewScale = canvasW / renderWidth;
                                     const lx = (dragPos && dragPos.layerId === layer.id) ? dragPos.x : layer.x;
@@ -898,25 +947,42 @@ export default function EditorPage() {
                                     const layerW = layer.width * previewScale;
                                     const layerH = layer.height * previewScale;
 
+                                    const commonStyle: React.CSSProperties = {
+                                        position: "absolute",
+                                        left: layerLeft,
+                                        top: layerTop,
+                                        width: layerW,
+                                        height: layerH,
+                                        ...getLayerStyle(layer),
+                                        cursor: isDragging && selectedLayerId === layer.id ? "grabbing" : "grab",
+                                        outline: selectedLayerId === layer.id ? "2px solid var(--accent-purple)" : "none",
+                                        outlineOffset: -2,
+                                        userSelect: "none",
+                                    };
+
+                                    // Text layers: inline SVG so Google Fonts work in preview
+                                    if (layer.isTextLayer && layer.svgContent) {
+                                        return (
+                                            <div
+                                                key={layer.id}
+                                                style={commonStyle}
+                                                dangerouslySetInnerHTML={{ __html: layer.svgContent }}
+                                                onMouseDown={(e) => handleCanvasMouseDown(e, layer.id)}
+                                            />
+                                        );
+                                    }
+
+                                    // Non-text layers: blob URL img
+                                    const imgUrl = layerImageUrls.get(layer.id);
+                                    if (!imgUrl) return null;
+
                                     return (
                                         <img
                                             key={layer.id}
                                             src={imgUrl}
                                             alt={layer.name}
                                             draggable={false}
-                                            style={{
-                                                position: "absolute",
-                                                left: layerLeft,
-                                                top: layerTop,
-                                                width: layerW,
-                                                height: layerH,
-                                                objectFit: "contain",
-                                                ...getLayerStyle(layer),
-                                                cursor: isDragging && selectedLayerId === layer.id ? "grabbing" : "grab",
-                                                outline: selectedLayerId === layer.id ? "2px solid var(--accent-purple)" : "none",
-                                                outlineOffset: -2,
-                                                userSelect: "none",
-                                            }}
+                                            style={{ ...commonStyle, objectFit: "contain" }}
                                             onMouseDown={(e) => handleCanvasMouseDown(e, layer.id)}
                                         />
                                     );
@@ -1174,6 +1240,41 @@ export default function EditorPage() {
 
                             </>
                         )}
+
+                        {/* Shared Position/Size Panel (shown when any layer selected) */}
+                        {selectedLayer && (
+                            <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border-glass)" }}>
+                                <h4 style={{ fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-muted)", marginBottom: 10 }}>
+                                    <Move size={12} style={{ marginRight: 4, verticalAlign: -1 }} /> Pozisyon & Boyut
+                                </h4>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                                    <div className="settings-group" style={{ margin: 0 }}>
+                                        <label style={{ fontSize: "0.7rem" }}>X</label>
+                                        <input type="number" className="input" style={{ fontSize: "0.8rem", padding: "4px 8px" }}
+                                            value={Math.round(selectedLayer.x)}
+                                            onChange={(e) => handleUpdateLayerPosition(selectedLayer.id, { x: parseInt(e.target.value) || 0, y: selectedLayer.y })} />
+                                    </div>
+                                    <div className="settings-group" style={{ margin: 0 }}>
+                                        <label style={{ fontSize: "0.7rem" }}>Y</label>
+                                        <input type="number" className="input" style={{ fontSize: "0.8rem", padding: "4px 8px" }}
+                                            value={Math.round(selectedLayer.y)}
+                                            onChange={(e) => handleUpdateLayerPosition(selectedLayer.id, { x: selectedLayer.x, y: parseInt(e.target.value) || 0 })} />
+                                    </div>
+                                    <div className="settings-group" style={{ margin: 0 }}>
+                                        <label style={{ fontSize: "0.7rem" }}>W</label>
+                                        <input type="number" className="input" style={{ fontSize: "0.8rem", padding: "4px 8px" }}
+                                            value={Math.round(selectedLayer.width)}
+                                            onChange={(e) => handleUpdateLayerPosition(selectedLayer.id, { width: parseInt(e.target.value) || 100 })} />
+                                    </div>
+                                    <div className="settings-group" style={{ margin: 0 }}>
+                                        <label style={{ fontSize: "0.7rem" }}>H</label>
+                                        <input type="number" className="input" style={{ fontSize: "0.8rem", padding: "4px 8px" }}
+                                            value={Math.round(selectedLayer.height)}
+                                            onChange={(e) => handleUpdateLayerPosition(selectedLayer.id, { height: parseInt(e.target.value) || 100 })} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -1277,7 +1378,7 @@ export default function EditorPage() {
                                                                 background: `${color}cc`,
                                                                 borderColor: selectedLayerId === layer.id ? color : "transparent",
                                                             }}
-                                                            onClick={(e) => { e.stopPropagation(); setSelectedLayerId(layer.id); }}
+                                                            onClick={(e) => { e.stopPropagation(); selectLayer(layer.id); }}
                                                             onMouseDown={(e) => handleBarDrag(layer.id, "move", e)}
                                                         >
                                                             <span className="timeline-bar-label">
