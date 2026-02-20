@@ -193,6 +193,8 @@ export default function EditorPage() {
     const [editingTextContent, setEditingTextContent] = useState<string>("");
     const [editingTextLayerId, setEditingTextLayerId] = useState<string | null>(null);
     const textUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const saveProjectRef = useRef<(() => Promise<void>) | null>(null);
 
     // Canvas drag state
     const [isDragging, setIsDragging] = useState(false);
@@ -690,6 +692,69 @@ export default function EditorPage() {
         }
     };
 
+    // Keep ref in sync so effects can call save without stale closures
+    saveProjectRef.current = handleSaveProject;
+
+    // Auto-save after 3 minutes of inactivity (once)
+    useEffect(() => {
+        const resetAutoSave = () => {
+            if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = setTimeout(() => {
+                if (saveProjectRef.current) saveProjectRef.current();
+            }, 3 * 60 * 1000);
+        };
+        window.addEventListener("mousemove", resetAutoSave);
+        window.addEventListener("keydown", resetAutoSave);
+        window.addEventListener("scroll", resetAutoSave, true);
+        resetAutoSave();
+        return () => {
+            window.removeEventListener("mousemove", resetAutoSave);
+            window.removeEventListener("keydown", resetAutoSave);
+            window.removeEventListener("scroll", resetAutoSave, true);
+            if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+        };
+    }, []);
+
+    // Save on page leave / tab close via sendBeacon
+    useEffect(() => {
+        const handleBeforeUnload = () => {
+            const layers = project?.sourceFiles.flatMap(sf => sf.layers) || [];
+            for (const layer of layers) {
+                const anim = layer.layerAnimations[0];
+                if (anim) {
+                    navigator.sendBeacon(
+                        `/api/projects/${projectId}/layers/${layer.id}`,
+                        new Blob([JSON.stringify({
+                            animationType: anim.animationType, durationMs: anim.durationMs,
+                            delayMs: anim.delayMs, easing: anim.easing,
+                            fromOpacity: anim.fromOpacity, toOpacity: anim.toOpacity,
+                            fromScale: anim.fromScale, toScale: anim.toScale,
+                        })], { type: "application/json" })
+                    );
+                }
+                if (layer.isTextLayer) {
+                    navigator.sendBeacon(
+                        `/api/projects/${projectId}/text-layers/${layer.id}`,
+                        new Blob([JSON.stringify({
+                            textContent: layer.textContent, fontFamily: layer.fontFamily,
+                            fontSize: layer.fontSize, fontColor: layer.fontColor,
+                            textAlign: layer.textAlign, fontWeight: layer.fontWeight,
+                        })], { type: "application/json" })
+                    );
+                }
+            }
+        };
+        window.addEventListener("beforeunload", handleBeforeUnload);
+        return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+    }, [project, projectId]);
+
+    // Save before navigating back to dashboard
+    const handleBackClick = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        await handleSaveProject();
+        router.push("/dashboard");
+    };
+
     /* ── AI ── */
 
     const handleAIPrompt = async () => {
@@ -901,9 +966,9 @@ export default function EditorPage() {
                 {/* ═══ Top Bar ═══ */}
                 <div className="editor-topbar">
                     <div className="editor-topbar-title">
-                        <Link href="/dashboard" style={{ color: "var(--text-secondary)", display: "flex" }}>
+                        <a onClick={handleBackClick} style={{ color: "var(--text-secondary)", display: "flex", cursor: "pointer" }}>
                             <ArrowLeft size={20} />
-                        </Link>
+                        </a>
                         <h2>{project.name}</h2>
                         <span className={`status-badge status-${project.status}`}>{project.status}</span>
                         <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginLeft: 8 }}>
