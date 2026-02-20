@@ -23,6 +23,11 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
+# Dummy env vars for build (real values set at runtime)
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+ENV NEXTAUTH_SECRET="build-time-dummy-secret"
+ENV NEXTAUTH_URL="http://localhost:3000"
+
 # Build Next.js (standalone mode)
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
