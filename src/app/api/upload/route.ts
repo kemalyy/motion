@@ -123,7 +123,7 @@ export async function POST(request: Request) {
                         y: layer.y,
                         width: layer.width,
                         height: layer.height,
-                        metadata: layer.metadata as Record<string, unknown>,
+                        metadata: JSON.parse(JSON.stringify(layer.metadata)),
                     },
                 })
             )

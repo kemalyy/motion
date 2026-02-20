@@ -56,7 +56,7 @@ export async function POST(request: Request) {
         // Map suggestions to layers by name
         const mappedSuggestions = suggestions.map((s) => {
             const layer = allLayers.find(
-                (l) => l.name.toLowerCase() === s.layerName.toLowerCase()
+                (l: { id: string; name: string }) => l.name.toLowerCase() === s.layerName.toLowerCase()
             );
             return {
                 ...s,
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
             data: {
                 projectId,
                 prompt,
-                aiResponse: mappedSuggestions as unknown as Record<string, unknown>[],
+                aiResponse: JSON.parse(JSON.stringify(mappedSuggestions)),
                 applied: false,
             },
         });
