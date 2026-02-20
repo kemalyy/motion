@@ -153,9 +153,8 @@ export default function EditorPage() {
     const [renderStatus, setRenderStatus] = useState("");
     const [visibleLayers, setVisibleLayers] = useState<Set<string>>(new Set());
     const [layerImageUrls, setLayerImageUrls] = useState<Map<string, string>>(new Map());
-    const [showRenderSettings, setShowRenderSettings] = useState(false);
     const [dragLayerId, setDragLayerId] = useState<string | null>(null);
-    const [bottomTab, setBottomTab] = useState<'timeline' | 'ai'>('timeline');
+    const [bottomTab, setBottomTab] = useState<'timeline' | 'ai' | 'settings'>('timeline');
 
     // Render settings (editable, synced to project)
     const [renderWidth, setRenderWidth] = useState(1080);
@@ -354,7 +353,6 @@ export default function EditorPage() {
             if (res.ok) {
                 fetchProject();
                 toast.success("Render ayarları kaydedildi");
-                setShowRenderSettings(false);
             }
         } catch { toast.error("Ayarlar kaydedilemedi"); }
     };
@@ -573,12 +571,6 @@ export default function EditorPage() {
                             <Save size={16} /> Kaydet
                         </button>
                         <button
-                            className="btn btn-ghost"
-                            onClick={() => setShowRenderSettings(!showRenderSettings)}
-                        >
-                            <Settings2 size={16} /> Ayarlar
-                        </button>
-                        <button
                             className="btn btn-primary"
                             onClick={handleRender}
                             disabled={rendering || allLayers.length === 0}
@@ -591,95 +583,6 @@ export default function EditorPage() {
                         </button>
                     </div>
                 </div>
-
-                {/* ═══ Render Settings Dropdown ═══ */}
-                {showRenderSettings && (
-                    <div className="render-settings-panel">
-                        <div className="render-settings-header">
-                            <h4><Monitor size={16} /> Render Ayarları</h4>
-                            <button className="btn-icon" onClick={() => setShowRenderSettings(false)}>
-                                <X size={16} />
-                            </button>
-                        </div>
-                        <div className="render-settings-body">
-                            <div className="render-settings-group">
-                                <label>Çözünürlük Presetleri</label>
-                                <div className="resolution-presets">
-                                    {RESOLUTION_PRESETS.map((p) => (
-                                        <button
-                                            key={p.label}
-                                            className={`preset-chip ${renderWidth === p.w && renderHeight === p.h ? "active" : ""}`}
-                                            onClick={() => { setRenderWidth(p.w); setRenderHeight(p.h); }}
-                                        >
-                                            {p.label}
-                                            <span>{p.w}×{p.h}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="render-settings-row">
-                                <div className="render-settings-group">
-                                    <label>Genişlik (px)</label>
-                                    <input
-                                        type="number" min={100} max={4096}
-                                        value={renderWidth}
-                                        onChange={(e) => setRenderWidth(parseInt(e.target.value) || 100)}
-                                    />
-                                </div>
-                                <div className="render-settings-group">
-                                    <label>Yükseklik (px)</label>
-                                    <input
-                                        type="number" min={100} max={4096}
-                                        value={renderHeight}
-                                        onChange={(e) => setRenderHeight(parseInt(e.target.value) || 100)}
-                                    />
-                                </div>
-                                <div className="render-settings-group">
-                                    <label>FPS</label>
-                                    <select value={renderFps} onChange={(e) => setRenderFps(parseInt(e.target.value))}>
-                                        <option value={24}>24</option>
-                                        <option value={25}>25</option>
-                                        <option value={30}>30</option>
-                                        <option value={60}>60</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="render-settings-row">
-                                <div className="render-settings-group">
-                                    <label>Süre: {(renderDuration / 1000).toFixed(1)}s</label>
-                                    <input
-                                        type="range" min={1000} max={30000} step={500}
-                                        value={renderDuration}
-                                        onChange={(e) => setRenderDuration(parseInt(e.target.value))}
-                                    />
-                                </div>
-                                <div className="render-settings-group">
-                                    <label>Arka Plan</label>
-                                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                                        <input
-                                            type="color"
-                                            value={renderBg}
-                                            onChange={(e) => setRenderBg(e.target.value)}
-                                            style={{ width: 36, height: 28, padding: 0, border: "none", borderRadius: 4, cursor: "pointer" }}
-                                        />
-                                        <input
-                                            type="text"
-                                            value={renderBg}
-                                            onChange={(e) => setRenderBg(e.target.value)}
-                                            style={{ flex: 1, padding: "4px 8px", background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-glass)", borderRadius: 4, color: "var(--text-primary)", fontSize: "0.8rem" }}
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <button className="btn btn-primary" style={{ width: "100%", marginTop: 8 }} onClick={saveRenderSettings}>
-                                <Save size={16} /> Ayarları Kaydet & Uygula
-                            </button>
-                        </div>
-                    </div>
-                )}
 
                 {/* ═══ Main Content ═══ */}
                 <div className="editor-main">
@@ -906,7 +809,7 @@ export default function EditorPage() {
                     </div>
                 </div>
 
-                {/* ═══ Bottom Tabs: Timeline / AI ═══ */}
+                {/* ═══ Bottom Tabs: Timeline / AI / Settings ═══ */}
                 <div className="bottom-tabs-container">
                     <div className="bottom-tabs-header">
                         <button
@@ -920,6 +823,12 @@ export default function EditorPage() {
                             onClick={() => setBottomTab('ai')}
                         >
                             <Sparkles size={14} /> AI Asistan
+                        </button>
+                        <button
+                            className={`bottom-tab ${bottomTab === 'settings' ? 'active' : ''}`}
+                            onClick={() => setBottomTab('settings')}
+                        >
+                            <Settings2 size={14} /> Render Ayarları
                         </button>
                     </div>
 
@@ -1102,6 +1011,89 @@ export default function EditorPage() {
                                     </div>
                                 </details>
                             )}
+                        </div>
+                    )}
+
+                    {/* Settings Tab */}
+                    {bottomTab === 'settings' && (
+                        <div className="bottom-tab-content">
+                            <div className="render-settings-body">
+                                <div className="render-settings-group">
+                                    <label>Çözünürlük Presetleri</label>
+                                    <div className="resolution-presets">
+                                        {RESOLUTION_PRESETS.map((p) => (
+                                            <button
+                                                key={p.label}
+                                                className={`preset-chip ${renderWidth === p.w && renderHeight === p.h ? "active" : ""}`}
+                                                onClick={() => { setRenderWidth(p.w); setRenderHeight(p.h); }}
+                                            >
+                                                {p.label}
+                                                <span>{p.w}×{p.h}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="render-settings-row">
+                                    <div className="render-settings-group">
+                                        <label>Genişlik (px)</label>
+                                        <input
+                                            type="number" min={100} max={4096}
+                                            value={renderWidth}
+                                            onChange={(e) => setRenderWidth(parseInt(e.target.value) || 100)}
+                                        />
+                                    </div>
+                                    <div className="render-settings-group">
+                                        <label>Yükseklik (px)</label>
+                                        <input
+                                            type="number" min={100} max={4096}
+                                            value={renderHeight}
+                                            onChange={(e) => setRenderHeight(parseInt(e.target.value) || 100)}
+                                        />
+                                    </div>
+                                    <div className="render-settings-group">
+                                        <label>FPS</label>
+                                        <select value={renderFps} onChange={(e) => setRenderFps(parseInt(e.target.value))}>
+                                            <option value={24}>24</option>
+                                            <option value={25}>25</option>
+                                            <option value={30}>30</option>
+                                            <option value={60}>60</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="render-settings-row">
+                                    <div className="render-settings-group">
+                                        <label>Süre: {(renderDuration / 1000).toFixed(1)}s</label>
+                                        <input
+                                            type="range" min={1000} max={30000} step={500}
+                                            value={renderDuration}
+                                            onChange={(e) => setRenderDuration(parseInt(e.target.value))}
+                                        />
+                                    </div>
+                                    <div className="render-settings-group">
+                                        <label>Arka Plan</label>
+                                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                            <input
+                                                type="color"
+                                                value={renderBg}
+                                                onChange={(e) => setRenderBg(e.target.value)}
+                                                style={{ width: 36, height: 28, padding: 0, border: "none", borderRadius: 4, cursor: "pointer" }}
+                                            />
+                                            <input
+                                                type="text"
+                                                value={renderBg}
+                                                onChange={(e) => setRenderBg(e.target.value)}
+                                                style={{ flex: 1, padding: "4px 8px", background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-glass)", borderRadius: 4, color: "var(--text-primary)", fontSize: "0.8rem" }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button className="btn btn-primary" style={{ width: "100%", marginTop: 8 }} onClick={saveRenderSettings}>
+                                    <Save size={16} /> Ayarları Kaydet & Uygula
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
