@@ -31,8 +31,6 @@ example/
 .gitignore
 
 # Docker
-docker-compose.yml
-Dockerfile
 .dockerignore
 
 # Misc
