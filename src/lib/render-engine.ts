@@ -189,7 +189,18 @@ function drawFrame(
             ctx.clip();
         }
 
-        ctx.drawImage(img, 0, 0, width, height);
+        // Replicate CSS objectFit: "contain" — preserve aspect ratio, center in canvas
+        const imgW = img.naturalWidth || img.width;
+        const imgH = img.naturalHeight || img.height;
+        const scaleX = width / imgW;
+        const scaleY = height / imgH;
+        const fitScale = Math.min(scaleX, scaleY);
+        const drawW = imgW * fitScale;
+        const drawH = imgH * fitScale;
+        const drawX = (width - drawW) / 2;
+        const drawY = (height - drawH) / 2;
+
+        ctx.drawImage(img, drawX, drawY, drawW, drawH);
         ctx.restore();
     }
 }
