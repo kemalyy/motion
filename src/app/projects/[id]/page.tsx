@@ -170,6 +170,8 @@ export default function EditorPage() {
     const [renderFps, setRenderFps] = useState(30);
     const [renderDuration, setRenderDuration] = useState(5000);
     const [renderBg, setRenderBg] = useState("#1a1a2e");
+    const [bgType, setBgType] = useState<"solid" | "gradient" | "transparent">("solid");
+    const [bgGradient, setBgGradient] = useState({ color1: "#1a1a2e", color2: "#4a00e0", angle: 135, type: "linear" });
 
     const timelineRef = useRef<HTMLDivElement>(null);
     const playIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -189,6 +191,8 @@ export default function EditorPage() {
                 setRenderFps(data.fps);
                 setRenderDuration(data.durationMs);
                 setRenderBg(data.backgroundColor);
+                setBgType(data.backgroundType || "solid");
+                if (data.backgroundGradient) setBgGradient(data.backgroundGradient);
 
                 const allLayerIds = data.sourceFiles.flatMap((sf: SourceFile) =>
                     sf.layers.map((l: Layer) => l.id)
@@ -400,6 +404,8 @@ export default function EditorPage() {
                     fps: renderFps,
                     durationMs: renderDuration,
                     backgroundColor: renderBg,
+                    backgroundType: bgType,
+                    backgroundGradient: bgType === "gradient" ? bgGradient : null,
                 }),
             });
             if (res.ok) {
@@ -478,6 +484,8 @@ export default function EditorPage() {
                 fps: renderFps,
                 durationMs: renderDuration,
                 backgroundColor: renderBg,
+                backgroundType: bgType,
+                backgroundGradient: bgType === "gradient" ? bgGradient : null,
                 layers: renderLayers,
             };
 
@@ -728,7 +736,13 @@ export default function EditorPage() {
                         <div
                             className="canvas-svg-container"
                             style={{
-                                background: renderBg,
+                                background: bgType === "transparent"
+                                    ? "repeating-conic-gradient(#808080 0% 25%, transparent 0% 50%) 50% / 20px 20px"
+                                    : bgType === "gradient"
+                                        ? bgGradient.type === "radial"
+                                            ? `radial-gradient(circle, ${bgGradient.color1}, ${bgGradient.color2})`
+                                            : `linear-gradient(${bgGradient.angle}deg, ${bgGradient.color1}, ${bgGradient.color2})`
+                                        : renderBg,
                                 width: canvasW,
                                 height: canvasH,
                             }}
@@ -1265,22 +1279,87 @@ export default function EditorPage() {
                                         />
                                     </div>
                                     <div className="render-settings-group">
-                                        <label>Arka Plan</label>
-                                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                                            <input
-                                                type="color"
-                                                value={renderBg}
-                                                onChange={(e) => setRenderBg(e.target.value)}
-                                                style={{ width: 36, height: 28, padding: 0, border: "none", borderRadius: 4, cursor: "pointer" }}
-                                            />
-                                            <input
-                                                type="text"
-                                                value={renderBg}
-                                                onChange={(e) => setRenderBg(e.target.value)}
-                                                style={{ flex: 1, padding: "4px 8px", background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-glass)", borderRadius: 4, color: "var(--text-primary)", fontSize: "0.8rem" }}
-                                            />
+                                        <label>Arka Plan Türü</label>
+                                        <div style={{ display: "flex", gap: 4 }}>
+                                            {(["solid", "gradient", "transparent"] as const).map((t) => (
+                                                <button
+                                                    key={t}
+                                                    className={`btn btn-ghost ${bgType === t ? "active" : ""}`}
+                                                    style={{ padding: "5px 10px", flex: 1, fontSize: "0.75rem" }}
+                                                    onClick={() => setBgType(t)}
+                                                >
+                                                    {t === "solid" ? "■ Düz" : t === "gradient" ? "◓ Gradient" : "□ Şeffaf"}
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
+
+                                    {bgType === "solid" && (
+                                        <div className="render-settings-group">
+                                            <label>Renk</label>
+                                            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                                                <input
+                                                    type="color" value={renderBg}
+                                                    onChange={(e) => setRenderBg(e.target.value)}
+                                                    style={{ width: 36, height: 28, padding: 0, border: "none", borderRadius: 4, cursor: "pointer" }}
+                                                />
+                                                <input type="text" value={renderBg}
+                                                    onChange={(e) => setRenderBg(e.target.value)}
+                                                    style={{ flex: 1, padding: "4px 8px", background: "rgba(255,255,255,0.05)", border: "1px solid var(--border-glass)", borderRadius: 4, color: "var(--text-primary)", fontSize: "0.8rem" }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {bgType === "gradient" && (
+                                        <>
+                                            <div className="render-settings-group">
+                                                <label>Tür</label>
+                                                <div style={{ display: "flex", gap: 4 }}>
+                                                    <button className={`btn btn-ghost ${bgGradient.type === "linear" ? "active" : ""}`}
+                                                        style={{ flex: 1, padding: "5px 10px", fontSize: "0.75rem" }}
+                                                        onClick={() => setBgGradient({ ...bgGradient, type: "linear" })}>Linear</button>
+                                                    <button className={`btn btn-ghost ${bgGradient.type === "radial" ? "active" : ""}`}
+                                                        style={{ flex: 1, padding: "5px 10px", fontSize: "0.75rem" }}
+                                                        onClick={() => setBgGradient({ ...bgGradient, type: "radial" })}>Radial</button>
+                                                </div>
+                                            </div>
+                                            <div className="render-settings-row">
+                                                <div className="render-settings-group">
+                                                    <label>Renk 1</label>
+                                                    <input type="color" value={bgGradient.color1}
+                                                        onChange={(e) => setBgGradient({ ...bgGradient, color1: e.target.value })}
+                                                        style={{ width: "100%", height: 28, padding: 0, border: "none", borderRadius: 4, cursor: "pointer" }} />
+                                                </div>
+                                                <div className="render-settings-group">
+                                                    <label>Renk 2</label>
+                                                    <input type="color" value={bgGradient.color2}
+                                                        onChange={(e) => setBgGradient({ ...bgGradient, color2: e.target.value })}
+                                                        style={{ width: "100%", height: 28, padding: 0, border: "none", borderRadius: 4, cursor: "pointer" }} />
+                                                </div>
+                                            </div>
+                                            {bgGradient.type === "linear" && (
+                                                <div className="render-settings-group">
+                                                    <label>Açı: {bgGradient.angle}°</label>
+                                                    <input type="range" min={0} max={360} step={5}
+                                                        value={bgGradient.angle}
+                                                        onChange={(e) => setBgGradient({ ...bgGradient, angle: parseInt(e.target.value) })} />
+                                                </div>
+                                            )}
+                                            <div style={{
+                                                height: 32, borderRadius: 6, marginTop: 4,
+                                                background: bgGradient.type === "radial"
+                                                    ? `radial-gradient(circle, ${bgGradient.color1}, ${bgGradient.color2})`
+                                                    : `linear-gradient(${bgGradient.angle}deg, ${bgGradient.color1}, ${bgGradient.color2})`
+                                            }} />
+                                        </>
+                                    )}
+
+                                    {bgType === "transparent" && (
+                                        <div style={{ padding: 8, fontSize: "0.78rem", color: "var(--text-muted)", background: "rgba(255,255,255,0.03)", borderRadius: 6 }}>
+                                            Şeffaf arka plan, WebM formatında alfa kanalı ile desteği aktif olacaktır.
+                                        </div>
+                                    )}
                                 </div>
 
                                 <button className="btn btn-primary" style={{ width: "100%", marginTop: 8 }} onClick={saveRenderSettings}>

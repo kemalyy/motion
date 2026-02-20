@@ -107,6 +107,8 @@ export async function PUT(
                 fps: body.fps,
                 durationMs: body.durationMs,
                 backgroundColor: body.backgroundColor,
+                backgroundType: body.backgroundType,
+                backgroundGradient: body.backgroundGradient,
             },
         });
 

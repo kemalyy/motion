@@ -73,6 +73,8 @@ model Project {
   fps             Int      @default(30)
   durationMs      Int      @default(5000)
   backgroundColor String   @default("#FFFFFF")
+  backgroundType  String   @default("solid")     // solid | gradient | transparent
+  backgroundGradient Json?                        // { color1, color2, angle, type }
   audioPath       String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

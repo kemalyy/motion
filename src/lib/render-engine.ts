@@ -29,6 +29,8 @@ export interface RenderConfig {
     fps: number;
     durationMs: number;
     backgroundColor: string;
+    backgroundType?: string; // solid | gradient | transparent
+    backgroundGradient?: { color1: string; color2: string; angle: number; type: string } | null;
     layers: RenderLayer[];
 }
 
@@ -158,11 +160,38 @@ function drawFrame(
     backgroundColor: string,
     layers: RenderLayer[],
     layerImages: Map<string, HTMLImageElement>,
-    currentTimeMs: number
+    currentTimeMs: number,
+    backgroundType?: string,
+    backgroundGradient?: { color1: string; color2: string; angle: number; type: string } | null,
 ) {
     ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = backgroundColor;
-    ctx.fillRect(0, 0, width, height);
+
+    const bgType = backgroundType || "solid";
+    if (bgType === "transparent") {
+        // leave transparent
+    } else if (bgType === "gradient" && backgroundGradient) {
+        const { color1, color2, angle, type: gradType } = backgroundGradient;
+        if (gradType === "radial") {
+            const grad = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, Math.max(width, height) / 2);
+            grad.addColorStop(0, color1);
+            grad.addColorStop(1, color2);
+            ctx.fillStyle = grad;
+        } else {
+            const rad = (angle || 0) * Math.PI / 180;
+            const x0 = width / 2 - Math.cos(rad) * width / 2;
+            const y0 = height / 2 - Math.sin(rad) * height / 2;
+            const x1 = width / 2 + Math.cos(rad) * width / 2;
+            const y1 = height / 2 + Math.sin(rad) * height / 2;
+            const grad = ctx.createLinearGradient(x0, y0, x1, y1);
+            grad.addColorStop(0, color1);
+            grad.addColorStop(1, color2);
+            ctx.fillStyle = grad;
+        }
+        ctx.fillRect(0, 0, width, height);
+    } else {
+        ctx.fillStyle = backgroundColor;
+        ctx.fillRect(0, 0, width, height);
+    }
 
     for (const layer of layers) {
         const img = layerImages.get(layer.id);
@@ -218,7 +247,7 @@ export async function renderToVideo(
     config: RenderConfig,
     onProgress?: ProgressCallback
 ): Promise<Blob> {
-    const { width, height, fps, durationMs, backgroundColor, layers } = config;
+    const { width, height, fps, durationMs, backgroundColor, backgroundType, backgroundGradient, layers } = config;
 
     onProgress?.(0, "Katmanlar hazırlanıyor...");
 
@@ -245,7 +274,7 @@ export async function renderToVideo(
     const ctx = canvas.getContext("2d")!;
 
     // Draw the first frame immediately
-    drawFrame(ctx, width, height, backgroundColor, layers, layerImages, 0);
+    drawFrame(ctx, width, height, backgroundColor, layers, layerImages, 0, backgroundType, backgroundGradient);
 
     // Determine best supported format
     let mimeType = "video/webm;codecs=vp9";
@@ -295,7 +324,7 @@ export async function renderToVideo(
             const currentTimeMs = Math.min(elapsed, durationMs);
 
             // Draw the current frame
-            drawFrame(ctx, width, height, backgroundColor, layers, layerImages, currentTimeMs);
+            drawFrame(ctx, width, height, backgroundColor, layers, layerImages, currentTimeMs, backgroundType, backgroundGradient);
 
             // Progress
             const progress = 0.15 + (currentTimeMs / durationMs) * 0.8;
@@ -307,7 +336,7 @@ export async function renderToVideo(
                 requestAnimationFrame(renderLoop);
             } else {
                 // Draw one more final frame to ensure we have the end state
-                drawFrame(ctx, width, height, backgroundColor, layers, layerImages, durationMs);
+                drawFrame(ctx, width, height, backgroundColor, layers, layerImages, durationMs, backgroundType, backgroundGradient);
 
                 // Small delay to let the recorder capture the last frame
                 setTimeout(() => {
