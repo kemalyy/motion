@@ -199,6 +199,8 @@ export default function EditorPage() {
     const playIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
+    const [waveformData, setWaveformData] = useState<Float32Array | null>(null);
+    const waveformCanvasRef = useRef<HTMLCanvasElement>(null);
 
     // Local text editing state (debounced to avoid fetchProject on every keystroke)
     const [editingTextContent, setEditingTextContent] = useState<string>("");
@@ -255,6 +257,54 @@ export default function EditorPage() {
     }, [projectId, router]);
 
     useEffect(() => { fetchProject(); }, [fetchProject]);
+
+    // Extract waveform from audio file
+    useEffect(() => {
+        if (!audioUrl) { setWaveformData(null); return; }
+        const extractWaveform = async () => {
+            try {
+                const response = await fetch(audioUrl);
+                const arrayBuffer = await response.arrayBuffer();
+                const audioCtx = new AudioContext();
+                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                const channel = audioBuffer.getChannelData(0);
+                const samples = 200;
+                const blockSize = Math.floor(channel.length / samples);
+                const data = new Float32Array(samples);
+                for (let i = 0; i < samples; i++) {
+                    let sum = 0;
+                    for (let j = 0; j < blockSize; j++) {
+                        sum += Math.abs(channel[i * blockSize + j]);
+                    }
+                    data[i] = sum / blockSize;
+                }
+                setWaveformData(data);
+                audioCtx.close();
+            } catch { /* audio decode failed, skip waveform */ }
+        };
+        extractWaveform();
+    }, [audioUrl]);
+
+    // Draw waveform on canvas
+    useEffect(() => {
+        const canvas = waveformCanvasRef.current;
+        if (!canvas || !waveformData) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const w = canvas.offsetWidth;
+        const h = canvas.offsetHeight;
+        canvas.width = w;
+        canvas.height = h;
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.25)';
+        const barW = w / waveformData.length;
+        const maxAmp = Math.max(...waveformData);
+        for (let i = 0; i < waveformData.length; i++) {
+            const amplitude = maxAmp > 0 ? waveformData[i] / maxAmp : 0;
+            const barH = amplitude * h;
+            ctx.fillRect(i * barW, h - barH, barW - 0.5, barH);
+        }
+    }, [waveformData]);
 
     const allLayers = useMemo(
         () => project?.sourceFiles.flatMap((sf) => sf.layers).sort((a, b) => a.sortOrder - b.sortOrder) || [],
@@ -1777,7 +1827,22 @@ export default function EditorPage() {
                                         });
                                     })()}
                                 </div>
-                                <div className="timeline-tracks" ref={timelineRef} onClick={handleTimelineClick}>
+                                <div className="timeline-tracks" ref={timelineRef} onClick={handleTimelineClick} style={{ position: 'relative' }}>
+                                    {/* Audio Waveform */}
+                                    {waveformData && (
+                                        <canvas
+                                            ref={waveformCanvasRef}
+                                            style={{
+                                                position: 'absolute',
+                                                inset: 0,
+                                                width: '100%',
+                                                height: '100%',
+                                                pointerEvents: 'none',
+                                                zIndex: 0,
+                                                opacity: 0.6,
+                                            }}
+                                        />
+                                    )}
                                     {/* Markers */}
                                     <div className="timeline-markers">
                                         {Array.from({ length: Math.ceil(renderDuration / 1000) + 1 }, (_, i) => (
