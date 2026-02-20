@@ -10,6 +10,10 @@ export interface RenderLayer {
     id: string;
     name: string;
     svgContent: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
     animation: {
         animationType: string;
         delayMs: number;
@@ -218,16 +222,22 @@ function drawFrame(
             ctx.clip();
         }
 
-        // Replicate CSS objectFit: "contain" — preserve aspect ratio, center in canvas
+        // Draw layer at its position with its dimensions
         const imgW = img.naturalWidth || img.width;
         const imgH = img.naturalHeight || img.height;
-        const scaleX = width / imgW;
-        const scaleY = height / imgH;
+        // Layer has its own x, y, width, height
+        const lx = layer.x || 0;
+        const ly = layer.y || 0;
+        const lw = layer.width || width;
+        const lh = layer.height || height;
+        // Fit image within layer bounds (objectFit: contain)
+        const scaleX = lw / imgW;
+        const scaleY = lh / imgH;
         const fitScale = Math.min(scaleX, scaleY);
         const drawW = imgW * fitScale;
         const drawH = imgH * fitScale;
-        const drawX = (width - drawW) / 2;
-        const drawY = (height - drawH) / 2;
+        const drawX = lx + (lw - drawW) / 2;
+        const drawY = ly + (lh - drawH) / 2;
 
         ctx.drawImage(img, drawX, drawY, drawW, drawH);
         ctx.restore();
